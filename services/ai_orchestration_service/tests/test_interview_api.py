@@ -1,0 +1,39 @@
+import httpx
+import pytest
+from httpx import AsyncClient
+
+from app.core.config import settings
+from app.main import app
+
+
+@pytest.mark.asyncio
+async def test_generate_question(monkeypatch):
+    async def fake_post(self, url, headers=None, json=None):
+        return httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {"message": {"content": "What is your experience with Python?"}}
+                ]
+            },
+        )
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", fake_post)
+
+    # Ensure the service is using the OpenAI provider for this test
+    settings.llm_provider = "openai"
+
+    payload = {
+        "context": {"job_description": "Backend developer"},
+        "history": [{"role": "candidate", "message": "Hi"}],
+    }
+
+    async with AsyncClient(app=app, base_url="http://test") as ac:
+        response = await ac.post(
+            "/api/v1/interview/generate-question", json=payload
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "question_text": "What is your experience with Python?"
+    }
