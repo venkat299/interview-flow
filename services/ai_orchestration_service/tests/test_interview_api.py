@@ -1,9 +1,14 @@
+import sys
+from pathlib import Path
+
 import httpx
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from app.core.config import settings
-from app.main import app
+sys.path.append(str(Path(__file__).resolve().parents[1] / "app"))
+
+from core.config import settings
+from main import app
 
 
 @pytest.mark.asyncio

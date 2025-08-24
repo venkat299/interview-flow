@@ -4,8 +4,8 @@ from typing import List
 
 import httpx
 
-from app.core.config import settings
-from app.schemas.interview import ConversationTurn, InterviewContext
+from core.config import settings
+from schemas.interview import ConversationTurn, InterviewContext
 
 
 async def generate_next_question(
