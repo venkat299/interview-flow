@@ -1,24 +1,15 @@
-FROM python:3.12-slim
+# In interview-flow-dev/services/ai_orchestration_service/Dockerfile
 
+FROM python:3.12-slim
 WORKDIR /app
 
-# Install Python dependencies defined for this service
+# This will now copy the pyproject.toml from the service's directory
+COPY pyproject.toml .
 
-COPY pyproject.toml /tmp/pyproject.toml
-RUN python - <<'PY'
-import tomllib, pathlib
-deps = tomllib.load(open('/tmp/pyproject.toml', 'rb'))['project']['dependencies']
-pathlib.Path('/tmp/requirements.txt').write_text('\n'.join(deps))
-PY
+# Install the project and its dependencies
+RUN pip install --no-cache-dir .
 
-RUN pip install --no-cache-dir -r /tmp/requirements.txt
-RUN rm /tmp/requirements.txt /tmp/pyproject.toml
-
-# Copy the service application code into the image
+# Copy the service's application code
 COPY app /app
 
-# Application code is copied directly into /app, so the FastAPI instance
-# lives in main.py at the root of the working directory. The previous
-# command attempted to import ``app.main`` which looked for /app/app
-# and failed with ``ModuleNotFoundError``. Import ``main:app`` instead.
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

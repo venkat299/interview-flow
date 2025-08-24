@@ -1,30 +1,29 @@
+# In interview-flow-dev/docker-compose.yml
+
 services:
   ai_orchestration_api:
     build:
-      context: .
-      dockerfile: services/ai_orchestration_service/Dockerfile
+      # Change the context to the service's own directory
+      context: ./services/ai_orchestration_service
+      # The Dockerfile is now at the root of the new context
+      dockerfile: Dockerfile
     ports:
       - "8001:8000"
     volumes:
       - ./services/ai_orchestration_service/app:/app
     env_file:
-      - ./services/ai_orchestration_service/.env  # copy from .env.example and set credentials
-    # The service's application files are mounted directly into /app.
-    # Since main.py lives at the root of that directory, the module
-    # path to the FastAPI instance is simply ``main:app`` rather than
-    # ``app.main:app``. Using ``app.main`` caused a ModuleNotFoundError
-    # because Python looked for ``/app/app`` which does not exist.
+      - ./services/ai_orchestration_service/.env
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
+  # (Apply similar changes to your session_api service)
   session_api:
     build:
-      context: .
-      dockerfile: services/interview_session_service/Dockerfile
+      context: ./services/interview_session_service
+      dockerfile: Dockerfile
     ports:
       - "8002:8000"
     volumes:
       - ./services/interview_session_service/app:/app
     env_file:
-      - ./services/interview_session_service/.env  # create if environment variables are needed
-    # See note above regarding module import paths within the container.
+      - ./services/interview_session_service/.env
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
