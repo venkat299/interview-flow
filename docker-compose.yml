@@ -13,9 +13,12 @@ services:
       - ./services/ai_orchestration_service/app:/app
     env_file:
       - ./services/ai_orchestration_service/.env
+    # Add the extra_hosts setting for Linux
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
-  # (Apply similar changes to your session_api service)
+  # (Apply similar changes to your session_api service if it needs to connect to the host)
   session_api:
     build:
       context: ./services/interview_session_service
@@ -26,4 +29,7 @@ services:
       - ./services/interview_session_service/app:/app
     env_file:
       - ./services/interview_session_service/.env
+    # Add the extra_hosts setting for Linux
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
