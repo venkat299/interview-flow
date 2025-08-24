@@ -32,7 +32,7 @@ async def generate_next_question(
         for turn in history:
             messages.append({"role": turn.role, "content": turn.message})
 
-        payload = {"model": "gpt-3.5-turbo", "messages": messages}
+        payload = {"model": settings.openai_model, "messages": messages}
         headers = {"Authorization": f"Bearer {settings.openai_api_key}"}
 
         async with httpx.AsyncClient(timeout=settings.llm_timeout) as client:
