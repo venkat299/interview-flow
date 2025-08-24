@@ -9,7 +9,12 @@ services:
       - ./services/ai_orchestration_service/app:/app
     env_file:
       - ./services/ai_orchestration_service/.env  # copy from .env.example and set credentials
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    # The service's application files are mounted directly into /app.
+    # Since main.py lives at the root of that directory, the module
+    # path to the FastAPI instance is simply ``main:app`` rather than
+    # ``app.main:app``. Using ``app.main`` caused a ModuleNotFoundError
+    # because Python looked for ``/app/app`` which does not exist.
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
   session_api:
     build:
@@ -21,4 +26,5 @@ services:
       - ./services/interview_session_service/app:/app
     env_file:
       - ./services/interview_session_service/.env  # create if environment variables are needed
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    # See note above regarding module import paths within the container.
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
