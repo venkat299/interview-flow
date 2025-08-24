@@ -26,5 +26,5 @@ gemini_api_key = ""
 # Default URL for a locally hosted LLM like LM Studio.
 # `host.docker.internal` allows Docker containers to access services
 # running on the host machine.
-local_llm_url = "http://host.docker.internal:1234/v1/chat/completions"
+local_llm_url = "https://248e110186a5.ngrok-free.app/v1/chat/completions"
 llm_timeout = 10.0
