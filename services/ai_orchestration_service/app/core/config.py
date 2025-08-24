@@ -1,7 +1,16 @@
 from pydantic import BaseSettings
 
+
 class Settings(BaseSettings):
-    """Application settings."""
+    """Application settings and LLM provider configuration."""
+
+    # Which LLM backend to use: "openai", "gemini", or "local"
+    llm_provider: str = "openai"
+
+    # API keys or URLs for the various providers
     openai_api_key: str = ""
+    gemini_api_key: str = ""
+    local_llm_url: str = "http://localhost:11434/api/generate"
+
 
 settings = Settings()
