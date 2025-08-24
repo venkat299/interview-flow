@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  ai_orchestration_api:
+    build:
+      context: ./services/ai_orchestration_service
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./services/ai_orchestration_service/app:/app
+    env_file:
+      - ./services/ai_orchestration_service/.env
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  session_api:
+    build:
+      context: ./services/interview_session_service
+      dockerfile: Dockerfile
+    ports:
+      - "8002:8000"
+    volumes:
+      - ./services/interview_session_service/app:/app
+    env_file:
+      - ./services/interview_session_service/.env
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
