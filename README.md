@@ -23,7 +23,7 @@ Run the services with Docker Compose:
    cp services/ai_orchestration_service/.env.example services/ai_orchestration_service/.env
    ```
 
-   Update `services/ai_orchestration_service/.env` with real values for `LLM_PROVIDER`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, and `LOCAL_LLM_URL`.
+    Update `services/ai_orchestration_service/.env` with real values for `LLM_PROVIDER`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `GEMINI_API_KEY`, and `LOCAL_LLM_URL`.
 
 2. Start the containers:
 
