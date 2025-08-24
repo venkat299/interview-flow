@@ -2,8 +2,8 @@
 
 from fastapi import APIRouter
 
-from app.schemas.interview import InterviewRequest, InterviewResponse
-from app.services.llm_service import generate_next_question
+from schemas.interview import InterviewRequest, InterviewResponse
+from services.llm_service import generate_next_question
 
 router = APIRouter()
 
