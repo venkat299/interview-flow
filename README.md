@@ -23,7 +23,15 @@ Run the services with Docker Compose:
    cp services/ai_orchestration_service/.env.example services/ai_orchestration_service/.env
    ```
 
-    Update `services/ai_orchestration_service/.env` with real values for `LLM_PROVIDER`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `GEMINI_API_KEY`, and `LOCAL_LLM_URL`.
+   Update `services/ai_orchestration_service/.env` with real values for `LLM_PROVIDER`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `GEMINI_API_KEY`, and `LOCAL_LLM_URL`.
+
+   When using an LLM running on your host machine (e.g., LM Studio), set
+   `LLM_PROVIDER=local` and point `LOCAL_LLM_URL` to the host using
+   `host.docker.internal`. For example:
+
+   ```bash
+   LOCAL_LLM_URL=http://host.docker.internal:1234/v1/chat/completions
+   ```
 
 2. Start the containers:
 
