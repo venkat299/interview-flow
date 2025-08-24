@@ -12,5 +12,8 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     local_llm_url: str = "http://localhost:11434/api/generate"
 
+    # Timeout (in seconds) for outgoing HTTP requests to LLM providers
+    llm_timeout: float = 10.0
+
 
 settings = Settings()

@@ -35,7 +35,7 @@ async def generate_next_question(
         payload = {"model": "gpt-3.5-turbo", "messages": messages}
         headers = {"Authorization": f"Bearer {settings.openai_api_key}"}
 
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=settings.llm_timeout) as client:
             response = await client.post(
                 "https://api.openai.com/v1/chat/completions",
                 headers=headers,
@@ -54,7 +54,7 @@ async def generate_next_question(
         payload = {
             "contents": [{"parts": [{"text": prompt_text}]}]
         }
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=settings.llm_timeout) as client:
             response = await client.post(url, json=payload)
             response.raise_for_status()
             data = response.json()
@@ -64,7 +64,7 @@ async def generate_next_question(
 
     if provider == "local":
         payload = {"prompt": prompt_text}
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=settings.llm_timeout) as client:
             response = await client.post(settings.local_llm_url, json=payload)
             response.raise_for_status()
             data = response.json()
