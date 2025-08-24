@@ -10,7 +10,7 @@ services:
     volumes:
       - ./services/ai_orchestration_service/app:/app
     env_file:
-      - ./services/ai_orchestration_service/.env
+      - ./services/ai_orchestration_service/.env  # copy from .env.example and set credentials
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   session_api:
@@ -22,5 +22,5 @@ services:
     volumes:
       - ./services/interview_session_service/app:/app
     env_file:
-      - ./services/interview_session_service/.env
+      - ./services/interview_session_service/.env  # create if environment variables are needed
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
