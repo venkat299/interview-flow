@@ -2,7 +2,7 @@
 
 from typing import List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class InterviewContext(BaseModel):
@@ -23,7 +23,7 @@ class InterviewRequest(BaseModel):
     """Request model for generating the next interview question."""
 
     context: InterviewContext
-    history: List[ConversationTurn] = []
+    history: List[ConversationTurn] = Field(default_factory=list)
 
 
 class InterviewResponse(BaseModel):
