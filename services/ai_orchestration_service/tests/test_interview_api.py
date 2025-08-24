@@ -1,6 +1,6 @@
 import httpx
 import pytest
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 
 from app.core.config import settings
 from app.main import app
@@ -8,15 +8,20 @@ from app.main import app
 
 @pytest.mark.asyncio
 async def test_generate_question(monkeypatch):
+    original_post = httpx.AsyncClient.post
+
     async def fake_post(self, url, headers=None, json=None):
-        return httpx.Response(
-            200,
-            json={
-                "choices": [
-                    {"message": {"content": "What is your experience with Python?"}}
-                ]
-            },
-        )
+        if url == "https://api.openai.com/v1/chat/completions":
+            return httpx.Response(
+                200,
+                json={
+                    "choices": [
+                        {"message": {"content": "What is your experience with Python?"}}
+                    ]
+                },
+                request=httpx.Request("POST", url),
+            )
+        return await original_post(self, url, headers=headers, json=json)
 
     monkeypatch.setattr(httpx.AsyncClient, "post", fake_post)
 
@@ -28,7 +33,9 @@ async def test_generate_question(monkeypatch):
         "history": [{"role": "candidate", "message": "Hi"}],
     }
 
-    async with AsyncClient(app=app, base_url="http://test") as ac:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
         response = await ac.post(
             "/api/v1/interview/generate-question", json=payload
         )
