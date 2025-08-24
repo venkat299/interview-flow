@@ -25,7 +25,7 @@ async def generate_next_question(
     )
     prompt_text = f"{system_prompt}\n{conversation_text}".strip()
 
-    provider = settings.llm_provider.lower()
+    provider = "local" # settings.llm_provider.lower()
 
     if provider == "openai":
         messages = [{"role": "system", "content": system_prompt}]
@@ -63,11 +63,18 @@ async def generate_next_question(
         )
 
     if provider == "local":
-        payload = {"prompt": prompt_text}
+        # The payload now matches the structure from the curl command
+        payload = {
+            "context": context.dict(),
+            "history": [turn.dict() for turn in history]
+        }
         async with httpx.AsyncClient(timeout=settings.llm_timeout) as client:
+            # The URL is now taken from settings, which you should update
             response = await client.post(settings.local_llm_url, json=payload)
             response.raise_for_status()
             data = response.json()
-        return data.get("question", "").strip()
+        
+        # Assuming the local server returns an OpenAI-compatible response
+        return data["choices"][0]["message"]["content"].strip()
 
     raise ValueError(f"Unsupported LLM provider: {settings.llm_provider}")
