@@ -38,3 +38,22 @@ Run the services with Docker Compose:
    ```bash
    docker-compose up --build
    ```
+
+## 4. Test Frontend & End-to-End Testing
+
+Once the backend services are running, you can drive a sample interview using the lightweight test frontend located in `test_frontend/`.
+
+1. Start the services if they are not already running:
+
+   ```bash
+   docker-compose up --build
+   ```
+
+2. In a new terminal, serve the static files:
+
+   ```bash
+   python -m http.server --directory test_frontend 3000
+   ```
+
+3. Open [http://localhost:3000](http://localhost:3000) in your browser. The page connects to the WebSocket service and lets you exchange messages with the AI interviewer.
+
