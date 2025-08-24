@@ -1,8 +1,8 @@
 services:
   ai_orchestration_api:
     build:
-      context: ./services/ai_orchestration_service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: services/ai_orchestration_service/Dockerfile
     ports:
       - "8001:8000"
     volumes:
@@ -18,8 +18,8 @@ services:
 
   session_api:
     build:
-      context: ./services/interview_session_service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: services/interview_session_service/Dockerfile
     ports:
       - "8002:8000"
     volumes:
