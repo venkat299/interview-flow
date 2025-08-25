@@ -1,7 +1,10 @@
 FROM python:3.12-slim
 
-WORKDIR /app
-ENV PYTHONPATH=/app
+# Place the code under /code/interview_services so that the package
+# "interview_services" is importable without extra path tweaks.
+WORKDIR /code
+ENV PYTHONPATH=/code
+
 
 COPY pyproject.toml /tmp/pyproject.toml
 RUN python - <<'PY'
@@ -13,6 +16,7 @@ PY
 RUN pip install --no-cache-dir -r /tmp/requirements.txt
 RUN rm /tmp/requirements.txt /tmp/pyproject.toml
 
-COPY . /app
+COPY . /code/interview_services
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "interview_services.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+

@@ -41,5 +41,6 @@ services:
     ports:
       - "8003:8000"
     volumes:
-      - ./services/interview_services:/app
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+      - ./services/interview_services:/code/interview_services
+    command: uvicorn interview_services.app.main:app --host 0.0.0.0 --port 8000 --reload
+
