@@ -1,7 +1,7 @@
 class Settings:
     """Simplified settings for LLM configuration."""
     # Which LLM backend to use: "openai" or "local"
-    llm_provider: str = "openai"
+    llm_provider: str = "local"
     # API keys or URLs for the various providers
     openai_api_key: str = ""
     openai_model: str = "gpt-3.5-turbo"
