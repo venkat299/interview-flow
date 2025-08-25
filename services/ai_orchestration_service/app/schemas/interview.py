@@ -30,3 +30,9 @@ class InterviewResponse(BaseModel):
     """Response model containing the generated question text."""
 
     question_text: str
+
+
+class TopicsResponse(BaseModel):
+    """Response model containing inferred interview topics."""
+
+    topics: List[str]
