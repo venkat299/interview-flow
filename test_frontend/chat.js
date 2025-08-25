@@ -4,7 +4,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const sendButton = document.getElementById('send-button');
     const statusIndicator = document.getElementById('status-indicator');
 
-    const socket = new WebSocket('ws://localhost:8002/ws/test-interview-123');
+    const wsUrl = 'ws://localhost:8002/api/v1/ws/test-interview-123';
+    console.log('Connecting to WebSocket:', wsUrl);
+    const socket = new WebSocket(wsUrl);
     const jobDescription = sessionStorage.getItem('job_description') || '';
     const resume = sessionStorage.getItem('candidate_resume') || '';
 
@@ -18,19 +20,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
     socket.onopen = () => {
         statusIndicator.textContent = 'Connected. Waiting for interview to start...';
-        socket.send(
-            JSON.stringify({
-                event: 'join_session',
-                payload: {
-                    interview_id: 'test-interview-123',
-                    job_description: jobDescription,
-                    candidate_resume: resume,
-                },
-            })
-        );
+        const joinPayload = {
+            event: 'join_session',
+            payload: {
+                interview_id: 'test-interview-123',
+                job_description: jobDescription,
+                candidate_resume: resume,
+            },
+        };
+        console.log('>>', joinPayload);
+        socket.send(JSON.stringify(joinPayload));
     };
 
     socket.onmessage = (event) => {
+        console.log('<<', event.data);
         const data = JSON.parse(event.data);
         statusIndicator.textContent = 'Connected';
         switch (data.event) {
@@ -56,17 +59,23 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     };
 
-    socket.onclose = () => {
+    socket.onclose = (event) => {
+        console.log('WebSocket closed:', event);
         statusIndicator.textContent = 'Connection closed.';
         chatInput.disabled = true;
         sendButton.disabled = true;
+    };
+    socket.onerror = (event) => {
+        console.error('WebSocket error:', event);
     };
 
     function sendMessage() {
         const messageText = chatInput.value;
         if (messageText.trim() !== '') {
             addMessage('candidate', messageText);
-            socket.send(JSON.stringify({ event: 'send_answer', payload: { answer_text: messageText } }));
+            const messagePayload = { event: 'send_answer', payload: { answer_text: messageText } };
+            console.log('>>', messagePayload);
+            socket.send(JSON.stringify(messagePayload));
             chatInput.value = '';
         }
     }

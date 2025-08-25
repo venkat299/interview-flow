@@ -53,6 +53,7 @@ class ConnectionManager:
     async def handle_message(self, websocket: WebSocket, data: dict) -> None:
         """Process an incoming message from the client."""
 
+        logger.info("Received message: %s", data)
         conversation = self.history.setdefault(websocket, [])
         event = data.get("event")
 
@@ -87,20 +88,31 @@ class ConnectionManager:
         if USE_DIRECT:
             interview_context = InterviewContext(**context)
             turns = [ConversationTurn(**t) for t in history]
-            return await direct_generate_question(interview_context, turns)
+            question = await direct_generate_question(interview_context, turns)
+            logger.info("Direct generate_question response: %s", question)
+            return question
         payload = {"context": context, "history": history}
+        logger.info("POST %s/generate-question payload=%s", AI_API_URL, payload)
         async with httpx.AsyncClient() as client:
             resp = await client.post(f"{AI_API_URL}/generate-question", json=payload)
+            logger.info("Response status %s", getattr(resp, "status_code", "unknown"))
             resp.raise_for_status()
             data = resp.json()
+        logger.info("Response body: %s", data)
         return data["question_text"]
 
     async def _determine_topics(self, context: dict) -> List[str]:
         if USE_DIRECT:
             interview_context = InterviewContext(**context)
-            return await direct_determine_topics(interview_context)
+            topics = await direct_determine_topics(interview_context)
+            logger.info("Direct determine_topics response: %s", topics)
+            return topics
+        logger.info("POST %s/determine-topics payload=%s", AI_API_URL, context)
         async with httpx.AsyncClient() as client:
             resp = await client.post(f"{AI_API_URL}/determine-topics", json=context)
+            logger.info("Response status %s", getattr(resp, "status_code", "unknown"))
             resp.raise_for_status()
-            return resp.json().get("topics", [])
+            data = resp.json()
+        logger.info("Response body: %s", data)
+        return data.get("topics", [])
 
