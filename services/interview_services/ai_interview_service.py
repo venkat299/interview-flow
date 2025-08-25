@@ -33,6 +33,10 @@ async def generate_next_question(
         payload = {"model": "google/gemma-3-1b", "messages": messages, "stream": False}
         headers = {"Content-Type": "application/json"}
         url = settings.local_llm_url
+        if not url:
+            raise ValueError("local_llm_url must be configured for local LLM provider")
+        if not url.startswith(("http://", "https://")):
+            url = f"http://{url}"
     else:
         raise ValueError(f"Unsupported LLM provider: {settings.llm_provider}")
 
