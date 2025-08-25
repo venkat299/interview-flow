@@ -7,16 +7,19 @@
 </head>
 <body>
     <div id="form-container">
+
         <select id="prefill-select">
             <option value="">-- Select sample data --</option>
             <option value="frontend">Frontend Developer</option>
             <option value="data">Data Scientist</option>
         </select>
+
         <textarea id="job-description" placeholder="Job description"></textarea>
         <textarea id="resume" placeholder="Paste your resume here"></textarea>
         <button id="start-button">Start Interview</button>
     </div>
     <script>
+
     const samples = {
         frontend: {
             jd: 'We are looking for a frontend developer proficient in HTML, CSS, and JavaScript.',
@@ -34,6 +37,7 @@
         document.getElementById('job-description').value = choice ? choice.jd : '';
         document.getElementById('resume').value = choice ? choice.resume : '';
     });
+
 
     document.getElementById('start-button').addEventListener('click', () => {
         const jd = document.getElementById('job-description').value;
