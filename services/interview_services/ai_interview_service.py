@@ -33,12 +33,22 @@ async def generate_next_question(
         payload = {"model": "google/gemma-3-1b", "messages": messages, "stream": False}
         headers = {"Content-Type": "application/json"}
         url = settings.local_llm_url
+        if not url:
+            raise ValueError("local_llm_url must be configured for local LLM provider")
+        if not url.startswith(("http://", "https://")):
+            url = f"http://{url}"
     else:
         raise ValueError(f"Unsupported LLM provider: {settings.llm_provider}")
 
     async with httpx.AsyncClient(timeout=settings.llm_timeout) as client:
         response = await client.post(url, headers=headers, json=payload)
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            detail = exc.response.text.strip()
+            raise RuntimeError(
+                f"LLM provider request failed: {exc.response.status_code} {detail}"
+            ) from exc
         data = response.json()
 
     return data["choices"][0]["message"]["content"].strip()
