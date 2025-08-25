@@ -49,3 +49,21 @@ async def test_generate_question(monkeypatch):
     assert response.json() == {
         "question_text": "What is your experience with Python?"
     }
+
+
+@pytest.mark.asyncio
+async def test_determine_topics():
+    payload = {
+        "job_description": "Looking for Python developer",
+        "candidate_resume": "Experience with databases",
+    }
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
+        response = await ac.post(
+            "/api/v1/interview/determine-topics", json=payload
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"topics": ["python", "database"]}

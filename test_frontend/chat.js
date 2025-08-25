@@ -5,6 +5,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const statusIndicator = document.getElementById('status-indicator');
 
     const socket = new WebSocket('ws://localhost:8002/ws/test-interview-123');
+    const jobDescription = sessionStorage.getItem('job_description') || '';
+    const resume = sessionStorage.getItem('candidate_resume') || '';
 
     function addMessage(sender, text) {
         const message = document.createElement('div');
@@ -16,7 +18,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
     socket.onopen = () => {
         statusIndicator.textContent = 'Connected. Waiting for interview to start...';
-        socket.send(JSON.stringify({ event: 'join_session', payload: { interview_id: 'test-interview-123' } }));
+        socket.send(
+            JSON.stringify({
+                event: 'join_session',
+                payload: {
+                    interview_id: 'test-interview-123',
+                    job_description: jobDescription,
+                    candidate_resume: resume,
+                },
+            })
+        );
     };
 
     socket.onmessage = (event) => {
@@ -26,6 +37,9 @@ document.addEventListener("DOMContentLoaded", () => {
             case 'session_started':
                 chatInput.disabled = false;
                 sendButton.disabled = false;
+                break;
+            case 'topics':
+                addMessage('interviewer', 'Topics: ' + data.payload.topics.join(', '));
                 break;
             case 'new_question':
                 addMessage('interviewer', data.payload.question_text);

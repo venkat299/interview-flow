@@ -31,11 +31,11 @@ def patch_ai_url(monkeypatch):
 
 
 class DummyResponse:
-    def __init__(self, question):
-        self.question = question
+    def __init__(self, data):
+        self._data = data
 
     def json(self):
-        return {"question_text": self.question}
+        return self._data
 
     def raise_for_status(self):
         pass
@@ -44,19 +44,30 @@ class DummyResponse:
 @pytest.mark.asyncio
 async def test_join_session_sends_first_question(monkeypatch):
     async def fake_post(self, url, json=None):
+        if url.endswith("/determine-topics"):
+            return DummyResponse({"topics": ["python"]})
         assert url == "http://ai/interview/generate-question"
-        return DummyResponse("First question?")
+        return DummyResponse({"question_text": "First question?"})
 
     monkeypatch.setattr(httpx.AsyncClient, "post", fake_post)
 
     with TestClient(session_app) as client:
         with client.websocket_connect("/api/v1/ws/test") as websocket:
-            websocket.send_json({"event": "join_session", "payload": {"interview_id": "test"}})
+            websocket.send_json({
+                "event": "join_session",
+                "payload": {
+                    "interview_id": "test",
+                    "job_description": "Backend dev",
+                    "candidate_resume": "Experienced in Python",
+                },
+            })
             data1 = websocket.receive_json()
             data2 = websocket.receive_json()
+            data3 = websocket.receive_json()
 
     assert data1 == {"event": "session_started"}
-    assert data2 == {"event": "new_question", "payload": {"question_text": "First question?"}}
+    assert data2 == {"event": "topics", "payload": {"topics": ["python"]}}
+    assert data3 == {"event": "new_question", "payload": {"question_text": "First question?"}}
 
 
 @pytest.mark.asyncio
@@ -64,14 +75,24 @@ async def test_send_answer_triggers_followup(monkeypatch):
     questions = iter(["First question?", "Second question?"])
 
     async def fake_post(self, url, json=None):
-        return DummyResponse(next(questions))
+        if url.endswith("/determine-topics"):
+            return DummyResponse({"topics": ["python"]})
+        return DummyResponse({"question_text": next(questions)})
 
     monkeypatch.setattr(httpx.AsyncClient, "post", fake_post)
 
     with TestClient(session_app) as client:
         with client.websocket_connect("/api/v1/ws/test") as websocket:
-            websocket.send_json({"event": "join_session", "payload": {"interview_id": "test"}})
+            websocket.send_json({
+                "event": "join_session",
+                "payload": {
+                    "interview_id": "test",
+                    "job_description": "Backend dev",
+                    "candidate_resume": "Experienced in Python",
+                },
+            })
             websocket.receive_json()  # session_started
+            websocket.receive_json()  # topics
             websocket.receive_json()  # first question
 
             websocket.send_json({"event": "send_answer", "payload": {"answer_text": "hi"}})
