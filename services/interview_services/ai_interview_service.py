@@ -15,7 +15,7 @@ async def generate_next_question(
     system_prompt = (
         "You are an AI technical interviewer. "
         f"The job description is: {context.job_description}. "
-        "Ask the candidate the next question based on the conversation so far."
+        "Ask the candidate the next question based on the conversation so far. Your question should be concise"
     )
 
     provider = settings.llm_provider.lower()
@@ -30,7 +30,7 @@ async def generate_next_question(
         headers = {"Authorization": f"Bearer {settings.openai_api_key}"}
         url = "https://api.openai.com/v1/chat/completions"
     elif provider == "local":
-        payload = {"model": "google/gemma-3-1b", "messages": messages, "stream": False}
+        payload = {"model": "openai/gpt-oss-20b", "messages": messages, "stream": False}
         headers = {"Content-Type": "application/json"}
         url = settings.local_llm_url
         if not url:
@@ -58,6 +58,6 @@ async def determine_topics(context: InterviewContext) -> List[str]:
     """Infer interview topics from job description and resume."""
 
     text = f"{context.job_description} {context.candidate_resume or ''}".lower()
-    keywords = ["python", "javascript", "java", "frontend", "backend", "database"]
+    keywords = ["python", "javascript", "java", "frontend", "backend", "database", "data science", "machine learning"]
     topics = [word for word in keywords if word in text]
     return topics or ["general"]
