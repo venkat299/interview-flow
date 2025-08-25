@@ -109,7 +109,6 @@ async def test_local_llm_url_defaults_to_http(monkeypatch):
     assert question == "Hi"
     assert captured["url"] == "http://localhost:9999/v1/chat/completions"
 
-
 @pytest.mark.asyncio
 async def test_missing_local_llm_url_raises_error(monkeypatch):
     monkeypatch.setattr(settings, "llm_provider", "local")
