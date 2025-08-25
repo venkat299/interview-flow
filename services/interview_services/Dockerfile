@@ -5,6 +5,7 @@ FROM python:3.12-slim
 WORKDIR /code
 ENV PYTHONPATH=/code
 
+
 COPY pyproject.toml /tmp/pyproject.toml
 RUN python - <<'PY'
 import tomllib, pathlib
@@ -18,3 +19,4 @@ RUN rm /tmp/requirements.txt /tmp/pyproject.toml
 COPY . /code/interview_services
 
 CMD ["uvicorn", "interview_services.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
