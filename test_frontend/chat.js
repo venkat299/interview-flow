@@ -11,7 +11,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function addMessage(sender, text) {
         const message = document.createElement('div');
         message.classList.add('message', sender);
-        message.textContent = text;
+        message.innerHTML = marked.parse(text);
         chatLog.appendChild(message);
         chatLog.scrollTop = chatLog.scrollHeight;
     }
@@ -45,12 +45,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 addMessage('interviewer', data.payload.question_text);
                 break;
             case 'interviewer_typing':
-                statusIndicator.textContent = 'AI is thinking...';
+                statusIndicator.innerHTML = '<div class="spinner-border spinner-border-sm me-2" role="status"></div>AI is thinking...';
                 break;
             case 'session_ended':
                 addMessage('interviewer', data.payload.message);
                 chatInput.disabled = true;
                 sendButton.disabled = true;
+                statusIndicator.textContent = 'Interview ended';
                 break;
         }
     };
