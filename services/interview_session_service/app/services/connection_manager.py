@@ -8,6 +8,19 @@ from fastapi import WebSocket
 
 
 AI_API_URL = os.getenv("AI_ORCHESTRATION_URL")
+USE_DIRECT = os.getenv("AI_ORCHESTRATION_USE_DIRECT", "false").lower() == "true"
+
+if USE_DIRECT:
+    from services.ai_orchestration_service.app.schemas.interview import (
+        ConversationTurn,
+        InterviewContext,
+    )
+    from services.ai_orchestration_service.app.services.llm_service import (
+        generate_next_question as direct_generate_question,
+    )
+    from services.ai_orchestration_service.app.services.topic_service import (
+        determine_topics as direct_determine_topics,
+    )
 
 
 class ConnectionManager:
@@ -59,6 +72,10 @@ class ConnectionManager:
 
     async def _next_question(self, websocket: WebSocket, history: List[dict]) -> str:
         context = self.contexts.get(websocket, {"job_description": ""})
+        if USE_DIRECT:
+            interview_context = InterviewContext(**context)
+            turns = [ConversationTurn(**t) for t in history]
+            return await direct_generate_question(interview_context, turns)
         payload = {"context": context, "history": history}
         async with httpx.AsyncClient() as client:
             resp = await client.post(f"{AI_API_URL}/generate-question", json=payload)
@@ -66,7 +83,10 @@ class ConnectionManager:
             data = resp.json()
         return data["question_text"]
 
-    async def _determine_topics(self, context: dict) -> None:
+    async def _determine_topics(self, context: dict) -> List[str]:
+        if USE_DIRECT:
+            interview_context = InterviewContext(**context)
+            return await direct_determine_topics(interview_context)
         async with httpx.AsyncClient() as client:
             resp = await client.post(f"{AI_API_URL}/determine-topics", json=context)
             resp.raise_for_status()
