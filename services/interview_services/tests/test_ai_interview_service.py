@@ -108,3 +108,35 @@ async def test_local_llm_url_defaults_to_http(monkeypatch):
 
     assert question == "Hi"
     assert captured["url"] == "http://localhost:9999/v1/chat/completions"
+
+@pytest.mark.asyncio
+async def test_missing_local_llm_url_raises_error(monkeypatch):
+    monkeypatch.setattr(settings, "llm_provider", "local")
+    monkeypatch.setattr(settings, "local_llm_url", "")
+
+    with pytest.raises(ValueError, match="local_llm_url must be configured"):
+        await ai.generate_next_question(
+            InterviewContext(job_description="Backend"),
+            [],
+        )
+
+
+@pytest.mark.asyncio
+async def test_http_error_raises_runtime_error(monkeypatch):
+    monkeypatch.setattr(settings, "llm_provider", "local")
+    monkeypatch.setattr(settings, "local_llm_url", "http://localhost")
+
+    async def fake_post(self, url, headers=None, json=None):
+        return httpx.Response(
+            400,
+            text="bad request",
+            request=httpx.Request("POST", url),
+        )
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", fake_post)
+
+    with pytest.raises(RuntimeError, match="LLM provider request failed: 400"):
+        await ai.generate_next_question(
+            InterviewContext(job_description="Backend"),
+            [],
+        )
