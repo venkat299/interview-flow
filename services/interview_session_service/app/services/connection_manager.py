@@ -7,9 +7,7 @@ import httpx
 from fastapi import WebSocket
 
 
-AI_API_URL = os.getenv(
-    "AI_ORCHESTRATION_URL", "http://localhost:8001/api/v1/interview"
-)
+AI_API_URL = os.getenv("AI_ORCHESTRATION_URL")
 
 
 class ConnectionManager:
