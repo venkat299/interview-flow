@@ -4,11 +4,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const sendButton = document.getElementById('send-button');
     const statusIndicator = document.getElementById('status-indicator');
 
-    const wsUrl = 'ws://localhost:8002/api/v1/ws/test-interview-123';
-    console.log('Connecting to WebSocket:', wsUrl);
-    const socket = new WebSocket(wsUrl);
-    const jobDescription = sessionStorage.getItem('job_description') || '';
-    const resume = sessionStorage.getItem('candidate_resume') || '';
+    const apiBase = 'http://localhost:8003';
+    const context = {
+        job_description: sessionStorage.getItem('job_description') || '',
+        candidate_resume: sessionStorage.getItem('candidate_resume') || ''
+    };
+    let history = [];
 
     function addMessage(sender, text) {
         const message = document.createElement('div');
@@ -18,68 +19,60 @@ document.addEventListener("DOMContentLoaded", () => {
         chatLog.scrollTop = chatLog.scrollHeight;
     }
 
-    socket.onopen = () => {
-        statusIndicator.textContent = 'Connected. Waiting for interview to start...';
-        const joinPayload = {
-            event: 'join_session',
-            payload: {
-                interview_id: 'test-interview-123',
-                job_description: jobDescription,
-                candidate_resume: resume,
-            },
-        };
-        console.log('>>', joinPayload);
-        socket.send(JSON.stringify(joinPayload));
-    };
+    async function determineTopics() {
+        const resp = await fetch(`${apiBase}/determine-topics`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(context)
+        });
+        const data = await resp.json();
+        addMessage('interviewer', 'Topics: ' + data.topics.join(', '));
+    }
 
-    socket.onmessage = (event) => {
-        console.log('<<', event.data);
-        const data = JSON.parse(event.data);
-        statusIndicator.textContent = 'Connected';
-        switch (data.event) {
-            case 'session_started':
-                chatInput.disabled = false;
-                sendButton.disabled = false;
-                break;
-            case 'topics':
-                addMessage('interviewer', 'Topics: ' + data.payload.topics.join(', '));
-                break;
-            case 'new_question':
-                addMessage('interviewer', data.payload.question_text);
-                break;
-            case 'interviewer_typing':
-                statusIndicator.innerHTML = '<div class="spinner-border spinner-border-sm me-2" role="status"></div>AI is thinking...';
-                break;
-            case 'session_ended':
-                addMessage('interviewer', data.payload.message);
-                chatInput.disabled = true;
-                sendButton.disabled = true;
-                statusIndicator.textContent = 'Interview ended';
-                break;
+    async function askNextQuestion() {
+        const resp = await fetch(`${apiBase}/generate-question`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ context, history })
+        });
+        const data = await resp.json();
+        addMessage('interviewer', data.question_text);
+        history.push({ role: 'interviewer', message: data.question_text });
+    }
+
+    async function startInterview() {
+        statusIndicator.textContent = 'Starting interview...';
+        try {
+            await determineTopics();
+            await askNextQuestion();
+            statusIndicator.textContent = 'Connected';
+            chatInput.disabled = false;
+            sendButton.disabled = false;
+        } catch (err) {
+            console.error(err);
+            statusIndicator.textContent = 'Error contacting service';
         }
-    };
+    }
 
-    socket.onclose = (event) => {
-        console.log('WebSocket closed:', event);
-        statusIndicator.textContent = 'Connection closed.';
-        chatInput.disabled = true;
-        sendButton.disabled = true;
-    };
-    socket.onerror = (event) => {
-        console.error('WebSocket error:', event);
-    };
-
-    function sendMessage() {
+    async function sendMessage() {
         const messageText = chatInput.value;
         if (messageText.trim() !== '') {
             addMessage('candidate', messageText);
-            const messagePayload = { event: 'send_answer', payload: { answer_text: messageText } };
-            console.log('>>', messagePayload);
-            socket.send(JSON.stringify(messagePayload));
+            history.push({ role: 'candidate', message: messageText });
             chatInput.value = '';
+            statusIndicator.innerHTML = '<div class="spinner-border spinner-border-sm me-2" role="status"></div>AI is thinking...';
+            try {
+                await askNextQuestion();
+                statusIndicator.textContent = 'Connected';
+            } catch (err) {
+                console.error(err);
+                statusIndicator.textContent = 'Error contacting service';
+            }
         }
     }
 
     sendButton.addEventListener('click', sendMessage);
     chatInput.addEventListener('keypress', (e) => e.key === 'Enter' && sendMessage());
+
+    startInterview();
 });
