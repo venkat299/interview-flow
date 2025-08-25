@@ -16,14 +16,14 @@ USE_DIRECT = os.getenv("AI_ORCHESTRATION_USE_DIRECT", "false").lower() == "true"
 if USE_DIRECT:
 
     try:
-        from services.ai_orchestration_service.app.schemas.interview import (
+        from ai_orchestration_service.app.schemas.interview import (
             ConversationTurn,
             InterviewContext,
         )
-        from services.ai_orchestration_service.app.services.llm_service import (
+        from ai_orchestration_service.app.services.llm_service import (
             generate_next_question as direct_generate_question,
         )
-        from services.ai_orchestration_service.app.services.topic_service import (
+        from ai_orchestration_service.app.services.topic_service import (
             determine_topics as direct_determine_topics,
         )
     except ModuleNotFoundError as exc:
