@@ -44,9 +44,11 @@ Run the services with Docker Compose:
 By default the Interview Session Service reaches the AI Orchestration Service over
 HTTP. To call the orchestration logic directly without making HTTP requests, set
 `AI_ORCHESTRATION_USE_DIRECT=true` in `services/interview_session_service/.env`.
+
 This allows the services to invoke each other's methods in-process. If the
 orchestration package is not available, the session service logs a warning and
 falls back to HTTP.
+
 
 ## 4. Test Frontend & End-to-End Testing
 

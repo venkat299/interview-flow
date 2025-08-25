@@ -14,6 +14,7 @@ AI_API_URL = os.getenv("AI_ORCHESTRATION_URL")
 USE_DIRECT = os.getenv("AI_ORCHESTRATION_USE_DIRECT", "false").lower() == "true"
 
 if USE_DIRECT:
+
     try:
         from services.ai_orchestration_service.app.schemas.interview import (
             ConversationTurn,
