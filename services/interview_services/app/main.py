@@ -1,4 +1,6 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
 from interview_services.ai_interview_service import (
     generate_next_question,
     determine_topics,
@@ -11,6 +13,14 @@ from interview_services.schemas import (
 )
 
 app = FastAPI(title="Interview Service")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.post("/generate-question", response_model=InterviewResponse)
