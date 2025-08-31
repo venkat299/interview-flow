@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const interviewId = Date.now().toString();
     const ws = new WebSocket(`ws://localhost:8002/api/v1/ws/${interviewId}`);
+    const apiBase = 'http://localhost:8003';
 
     function addMessage(sender, text) {
         const message = document.createElement('div');
@@ -15,14 +16,38 @@ document.addEventListener('DOMContentLoaded', () => {
         chatLog.scrollTop = chatLog.scrollHeight;
     }
 
-    ws.onopen = () => {
+    async function getContextFromSamplesIfNeeded() {
+        const jd = (sessionStorage.getItem('job_description') || '').trim();
+        const resume = (sessionStorage.getItem('candidate_resume') || '').trim();
+        if (jd && resume) {
+            return { job_description: jd, candidate_resume: resume };
+        }
+        try {
+            const resp = await fetch(`${apiBase}/samples`);
+            const data = await resp.json();
+            const items = data.items || [];
+            if (items.length === 0) {
+                return { job_description: jd, candidate_resume: resume };
+            }
+            const key = items[0].key;
+            const itemResp = await fetch(`${apiBase}/samples/${encodeURIComponent(key)}`);
+            const item = await itemResp.json();
+            return {
+                job_description: item.job_description || jd || '',
+                candidate_resume: item.resume || resume || ''
+            };
+        } catch (e) {
+            console.error('Failed to load samples', e);
+            return { job_description: jd, candidate_resume: resume };
+        }
+    }
+
+    ws.onopen = async () => {
         statusIndicator.textContent = 'Starting interview...';
+        const context = await getContextFromSamplesIfNeeded();
         ws.send(JSON.stringify({
             event: 'join_session',
-            payload: {
-                job_description: sessionStorage.getItem('job_description') || '',
-                candidate_resume: sessionStorage.getItem('candidate_resume') || ''
-            }
+            payload: context
         }));
     };
 
