@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from interview_services.ai_interview_service import (
@@ -35,3 +35,26 @@ async def determine_topics_endpoint(context: InterviewContext) -> TopicsResponse
     """Infer interview topics from job description and resume."""
     topics = await determine_topics(context)
     return TopicsResponse(topics=topics)
+
+
+# ---- Sample data endpoints (SQLite-backed) ----
+from interview_services import sample_data_repo as samples
+
+
+@app.on_event("startup")
+def _startup_init_samples() -> None:
+    samples.init_db()
+    samples.seed_if_empty()
+
+
+@app.get("/samples")
+def list_samples():
+    return {"items": samples.list_samples()}
+
+
+@app.get("/samples/{key}")
+def get_sample(key: str):
+    item = samples.get_sample(key)
+    if not item:
+        raise HTTPException(status_code=404, detail="Sample not found")
+    return item

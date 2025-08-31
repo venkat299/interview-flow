@@ -12,6 +12,8 @@ class Settings:
     local_llm_url: str = "https://8cb5852bd7fb.ngrok-free.app/v1/chat/completions"
     # Timeout (in seconds) for outgoing HTTP requests to LLM providers
     llm_timeout: float = 10.0
+    # Path to local SQLite DB for sample resumes/job descriptions
+    samples_db_path: str = "data/samples.db"
 
 
 settings = Settings()
