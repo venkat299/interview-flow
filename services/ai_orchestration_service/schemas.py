@@ -30,7 +30,19 @@ class InterviewResponse(BaseModel):
     question_text: str
 
 
-class TopicsResponse(BaseModel):
-    """Response model containing inferred interview topics."""
+class TopicBlueprint(BaseModel):
+    """Details for a single interview topic."""
 
-    topics: List[str]
+    name: str
+    relevance_to_role: int
+    required_depth: str
+    jd_context: List[str]
+    resume_evidence: List[str]
+
+
+class InterviewBlueprintResponse(BaseModel):
+    """Structured blueprint for an interview session."""
+
+    interview_title: str
+    experience_level: str
+    topics: List[TopicBlueprint]

@@ -6,6 +6,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 import pytest
+import asyncio
 
 from interview_session_service import service as session
 
@@ -26,11 +27,21 @@ async def test_join_session_sends_first_question(monkeypatch):
     async def fake_question(self, websocket, history):
         return "First question?"
 
-    async def fake_topics(self, context):
-        return ["python"]
+    async def fake_blueprint(self, context):
+        return {
+            "topics": [
+                {
+                    "name": "python",
+                    "relevance_to_role": 1,
+                    "required_depth": "Fundamental",
+                    "jd_context": [],
+                    "resume_evidence": [],
+                }
+            ]
+        }
 
     monkeypatch.setattr(session.ConnectionManager, "_next_question", fake_question)
-    monkeypatch.setattr(session.ConnectionManager, "_determine_topics", fake_topics)
+    monkeypatch.setattr(session.ConnectionManager, "_create_blueprint", fake_blueprint)
 
     ws = DummyWebSocket()
     manager = session.ConnectionManager()
@@ -47,7 +58,20 @@ async def test_join_session_sends_first_question(monkeypatch):
     )
 
     assert ws.sent[0] == {"event": "session_started"}
-    assert ws.sent[1] == {"event": "topics", "payload": {"topics": ["python"]}}
+    assert ws.sent[1] == {
+        "event": "blueprint",
+        "payload": {
+            "topics": [
+                {
+                    "name": "python",
+                    "relevance_to_role": 1,
+                    "required_depth": "Fundamental",
+                    "jd_context": [],
+                    "resume_evidence": [],
+                }
+            ]
+        },
+    }
     assert ws.sent[2] == {
         "event": "new_question",
         "payload": {"question_text": "First question?"},
@@ -59,13 +83,29 @@ async def test_send_answer_triggers_followup(monkeypatch):
     questions = iter(["First question?", "Second question?"])
 
     async def fake_question(self, websocket, history):
+        await asyncio.sleep(0.1)
         return next(questions)
 
-    async def fake_topics(self, context):
-        return ["python"]
+    async def fake_evaluate(self, state, history):
+        await asyncio.sleep(0.1)
+        return {"score": 5}
+
+    async def fake_blueprint(self, context):
+        return {
+            "topics": [
+                {
+                    "name": "python",
+                    "relevance_to_role": 1,
+                    "required_depth": "Fundamental",
+                    "jd_context": [],
+                    "resume_evidence": [],
+                }
+            ]
+        }
 
     monkeypatch.setattr(session.ConnectionManager, "_next_question", fake_question)
-    monkeypatch.setattr(session.ConnectionManager, "_determine_topics", fake_topics)
+    monkeypatch.setattr(session.ConnectionManager, "_evaluate_answer", fake_evaluate)
+    monkeypatch.setattr(session.ConnectionManager, "_create_blueprint", fake_blueprint)
 
     ws = DummyWebSocket()
     manager = session.ConnectionManager()
@@ -82,12 +122,15 @@ async def test_send_answer_triggers_followup(monkeypatch):
     )
 
     ws.sent.clear()
+    start = asyncio.get_event_loop().time()
     await manager.handle_message(
         ws, {"event": "send_answer", "payload": {"answer_text": "hi"}}
     )
+    duration = asyncio.get_event_loop().time() - start
 
     assert ws.sent[0] == {"event": "interviewer_typing"}
     assert ws.sent[1] == {
         "event": "new_question",
         "payload": {"question_text": "Second question?"},
     }
+    assert duration < 0.2
