@@ -1,39 +1,6 @@
 # In interview-flow-dev/docker-compose.yml
 
 services:
-  ai_orchestration_api:
-    build:
-      # Change the context to the service's own directory
-      context: ./services/ai_orchestration_service
-      # The Dockerfile is now at the root of the new context
-      dockerfile: Dockerfile
-    ports:
-      - "8001:8000"
-    volumes:
-      - ./services/ai_orchestration_service/app:/app
-    env_file:
-      - ./services/ai_orchestration_service/.env
-    # Add the extra_hosts setting for Linux
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-
-  # (Apply similar changes to your session_api service if it needs to connect to the host)
-  session_api:
-    build:
-      context: ./services/interview_session_service
-      dockerfile: Dockerfile
-    ports:
-      - "8002:8000"
-    volumes:
-      - ./services/interview_session_service/app:/app
-    env_file:
-      - ./services/interview_session_service/.env
-    # Add the extra_hosts setting for Linux
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-
   interview_service:
     build:
       context: ./services/interview_services
