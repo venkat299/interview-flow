@@ -30,7 +30,7 @@ async def generate_next_question(
         headers = {"Authorization": f"Bearer {settings.openai_api_key}"}
         url = "https://api.openai.com/v1/chat/completions"
     elif provider == "local":
-        payload = {"model": "openai/gpt-oss-20b", "messages": messages, "stream": False}
+        payload = {"model": settings.local_model, "messages": messages, "stream": False}
         headers = {"Content-Type": "application/json"}
         url = settings.local_llm_url
         if not url:
