@@ -4,6 +4,8 @@ function initChat() {
     const sendButton = document.getElementById('send-button');
     const endButton = document.getElementById('end-button');
     const statusIndicator = document.getElementById('status-indicator');
+    const statusText = document.getElementById('status-text');
+    const statusSpinner = document.getElementById('status-spinner');
 
     const AI_SERVICE_URL = sessionStorage.getItem('AI_SERVICE_URL') || 'http://localhost:8003';
 
@@ -30,11 +32,13 @@ function initChat() {
 
     function setThinking(thinking) {
         if (thinking) {
-            statusIndicator.innerHTML = '<div class="spinner-border spinner-border-sm me-2" role="status"></div>AI is thinking...';
+            if (statusSpinner) statusSpinner.classList.remove('d-none');
+            if (statusText) statusText.textContent = 'AI is thinking...';
             chatInput.disabled = true;
             sendButton.disabled = true;
         } else {
-            statusIndicator.textContent = 'Connected';
+            if (statusSpinner) statusSpinner.classList.add('d-none');
+            if (statusText) statusText.textContent = 'Connected';
             chatInput.disabled = false;
             sendButton.disabled = false;
             chatInput.focus();
@@ -108,7 +112,7 @@ function initChat() {
 
     async function startInterview() {
         try {
-            statusIndicator.textContent = 'Connecting...';
+            if (statusText) statusText.textContent = 'Connecting...';
             await createBlueprint();
             setThinking(true);
             lastQuestion = await generateQuestion();
@@ -119,7 +123,8 @@ function initChat() {
             if (endButton) endButton.disabled = false;
         } catch (e) {
             console.error('Failed to start interview', e);
-            statusIndicator.textContent = 'Error starting interview';
+            if (statusSpinner) statusSpinner.classList.add('d-none');
+            if (statusText) statusText.textContent = 'Error starting interview';
         }
     }
 
@@ -144,7 +149,8 @@ function initChat() {
             addMessage('interviewer', nextQ);
         } catch (e) {
             console.error('Failed to send message', e);
-            statusIndicator.textContent = 'Error contacting AI service';
+            if (statusSpinner) statusSpinner.classList.add('d-none');
+            if (statusText) statusText.textContent = 'Error contacting AI service';
         } finally {
             setThinking(false);
         }
@@ -153,7 +159,8 @@ function initChat() {
     function endInterview() {
         const confirmed = window.confirm('Are you sure you want to end the interview?');
         if (!confirmed) return;
-        statusIndicator.textContent = 'Interview ended';
+        if (statusSpinner) statusSpinner.classList.add('d-none');
+        if (statusText) statusText.textContent = 'Interview ended';
         chatInput.disabled = true;
         sendButton.disabled = true;
         if (endButton) endButton.disabled = true;
