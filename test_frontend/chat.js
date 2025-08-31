@@ -2,6 +2,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const chatLog = document.getElementById('chat-log');
     const chatInput = document.getElementById('chat-input');
     const sendButton = document.getElementById('send-button');
+    const endButton = document.getElementById('end-button');
     const statusIndicator = document.getElementById('status-indicator');
 
     // Base URL of the AI orchestration service
@@ -49,6 +50,7 @@ document.addEventListener("DOMContentLoaded", () => {
             statusIndicator.textContent = 'Connected';
             chatInput.disabled = false;
             sendButton.disabled = false;
+            if (endButton) endButton.disabled = false;
         } catch (err) {
             console.error(err);
             statusIndicator.textContent = 'Error contacting service';
@@ -74,6 +76,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
     sendButton.addEventListener('click', sendMessage);
     chatInput.addEventListener('keypress', (e) => e.key === 'Enter' && sendMessage());
+
+    function endInterview() {
+        const confirmed = window.confirm('Are you sure you want to end the interview?');
+        if (!confirmed) return;
+        chatInput.disabled = true;
+        sendButton.disabled = true;
+        if (endButton) endButton.disabled = true;
+        statusIndicator.textContent = 'Interview ended by you';
+        addMessage('interviewer', 'Interview ended. Thank you for your time.');
+    }
+
+    if (endButton) {
+        endButton.addEventListener('click', endInterview);
+    }
 
     startInterview();
 });
