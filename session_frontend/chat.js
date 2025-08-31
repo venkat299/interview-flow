@@ -5,8 +5,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const statusIndicator = document.getElementById('status-indicator');
 
     const interviewId = Date.now().toString();
-    const ws = new WebSocket(`ws://localhost:8002/api/v1/ws/${interviewId}`);
-    const apiBase = 'http://localhost:8003';
+    const ws = new WebSocket(`ws://session_api:8000/api/v1/ws/${interviewId}`);
+    const apiBase = 'http://interview_service:8000';
 
     function addMessage(sender, text) {
         const message = document.createElement('div');
