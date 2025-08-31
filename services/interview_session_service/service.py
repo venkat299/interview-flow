@@ -8,6 +8,7 @@ from fastapi import WebSocket
 from .config import settings
 from .schemas import ConversationTurn, InterviewContext
 from .interview_state import InterviewState
+from .database import create_session, log_turn, end_session
 
 
 class ConnectionManager:
@@ -17,20 +18,30 @@ class ConnectionManager:
         self.history: Dict[WebSocket, List[dict]] = {}
         self.contexts: Dict[WebSocket, dict] = {}
         self.states: Dict[WebSocket, InterviewState] = {}
+        self.session_ids: Dict[WebSocket, str] = {}
 
-    async def connect(self, websocket: WebSocket) -> None:
+    async def connect(self, websocket: WebSocket, session_id: str) -> None:
         await websocket.accept()
         self.history[websocket] = []
+        self.session_ids[websocket] = session_id
 
     def disconnect(self, websocket: WebSocket) -> None:
+        session_id = self.session_ids.get(websocket)
+        state = self.states.get(websocket)
+        if session_id:
+            rubric = {"performance_log": state.performance_log} if state else None
+            end_session(session_id, rubric)
         self.history.pop(websocket, None)
         self.contexts.pop(websocket, None)
+        self.states.pop(websocket, None)
+        self.session_ids.pop(websocket, None)
 
     async def handle_message(self, websocket: WebSocket, data: dict) -> None:
         """Process an incoming message from the client."""
 
         conversation = self.history.setdefault(websocket, [])
         event = data.get("event")
+        session_id = self.session_ids.get(websocket)
 
         if event == "join_session":
             payload = data.get("payload", {})
@@ -41,10 +52,14 @@ class ConnectionManager:
             self.contexts[websocket] = context
             blueprint = await self._create_blueprint(context)
             self.states[websocket] = InterviewState(blueprint)
+            if session_id:
+                create_session(session_id, blueprint)
             await websocket.send_json({"event": "session_started"})
             await websocket.send_json({"event": "blueprint", "payload": blueprint})
             question = await self._next_question(websocket, conversation)
             conversation.append({"role": "interviewer", "message": question})
+            if session_id:
+                log_turn(session_id, "interviewer", question)
             await websocket.send_json(
                 {"event": "new_question", "payload": {"question_text": question}}
             )
@@ -59,7 +74,11 @@ class ConnectionManager:
             evaluation_result, question = await asyncio.gather(eval_task, question_task)
             if state:
                 state.update_state_after_answer(evaluation_result)
+            if session_id:
+                log_turn(session_id, "candidate", answer, evaluation_result)
             conversation.append({"role": "interviewer", "message": question})
+            if session_id:
+                log_turn(session_id, "interviewer", question)
             await websocket.send_json(
                 {"event": "new_question", "payload": {"question_text": question}}
             )

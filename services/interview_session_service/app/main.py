@@ -8,7 +8,7 @@ manager = ConnectionManager()
 
 @app.websocket("/api/v1/ws/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: str) -> None:
-    await manager.connect(websocket)
+    await manager.connect(websocket, session_id)
     try:
         while True:
             data = await websocket.receive_json()

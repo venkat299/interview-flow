@@ -1,7 +1,5 @@
 import sys
 from pathlib import Path
-import sys
-from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[2]))
 
@@ -42,10 +40,13 @@ async def test_join_session_sends_first_question(monkeypatch):
 
     monkeypatch.setattr(session.ConnectionManager, "_next_question", fake_question)
     monkeypatch.setattr(session.ConnectionManager, "_create_blueprint", fake_blueprint)
+    monkeypatch.setattr(session, "create_session", lambda *a, **k: None)
+    monkeypatch.setattr(session, "log_turn", lambda *a, **k: None)
+    monkeypatch.setattr(session, "end_session", lambda *a, **k: None)
 
     ws = DummyWebSocket()
     manager = session.ConnectionManager()
-    await manager.connect(ws)
+    await manager.connect(ws, "session-test")
     await manager.handle_message(
         ws,
         {
@@ -106,10 +107,13 @@ async def test_send_answer_triggers_followup(monkeypatch):
     monkeypatch.setattr(session.ConnectionManager, "_next_question", fake_question)
     monkeypatch.setattr(session.ConnectionManager, "_evaluate_answer", fake_evaluate)
     monkeypatch.setattr(session.ConnectionManager, "_create_blueprint", fake_blueprint)
+    monkeypatch.setattr(session, "create_session", lambda *a, **k: None)
+    monkeypatch.setattr(session, "log_turn", lambda *a, **k: None)
+    monkeypatch.setattr(session, "end_session", lambda *a, **k: None)
 
     ws = DummyWebSocket()
     manager = session.ConnectionManager()
-    await manager.connect(ws)
+    await manager.connect(ws, "session-test")
     await manager.handle_message(
         ws,
         {
