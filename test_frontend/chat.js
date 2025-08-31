@@ -115,6 +115,8 @@ function initChat() {
             history.push({ role: 'interviewer', message: lastQuestion });
             addMessage('interviewer', lastQuestion);
             setThinking(false);
+            // Enable the end interview button once the interview has started
+            if (endButton) endButton.disabled = false;
         } catch (e) {
             console.error('Failed to start interview', e);
             statusIndicator.textContent = 'Error starting interview';
