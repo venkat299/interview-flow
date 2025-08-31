@@ -13,6 +13,15 @@ async def determine_topics(context: InterviewContext) -> List[str]:
     """
 
     text = f"{context.job_description} {context.candidate_resume or ''}".lower()
-    keywords = ["python", "javascript", "java", "frontend", "backend", "database"]
+    keywords = [
+        "python",
+        "javascript",
+        "java",
+        "frontend",
+        "backend",
+        "database",
+        "data science",
+        "machine learning",
+    ]
     topics = [word for word in keywords if word in text]
     return topics or ["general"]

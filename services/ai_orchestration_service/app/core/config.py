@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     # Default OpenAI model to use
     openai_model: str
     gemini_api_key: str
+    # Model identifier for local OpenAI-compatible servers
+    local_model: str = "google/gemma-3-1b"
     # Default endpoint for a locally hosted model.
     # `host.docker.internal` lets containers reach services on the host.
     # local_llm_url: str = "http://host.docker.internal:1234/v1/chat/completions"
