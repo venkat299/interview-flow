@@ -22,6 +22,9 @@ class InterviewRequest(BaseModel):
 
     context: InterviewContext
     history: List[ConversationTurn] = Field(default_factory=list)
+    current_topic: str
+    current_difficulty: int
+    persona: str = "friendly_mentor"
 
 
 class InterviewResponse(BaseModel):
@@ -46,3 +49,21 @@ class InterviewBlueprintResponse(BaseModel):
     interview_title: str
     experience_level: str
     topics: List[TopicBlueprint]
+
+
+class EvaluationRequest(BaseModel):
+    """Request model for evaluating a candidate's answer."""
+
+    question: str
+    answer: str
+    topic_blueprint: TopicBlueprint
+
+
+class EvaluationResponse(BaseModel):
+    """Evaluation details returned by the LLM."""
+
+    score: float
+    assessed_depth: str
+    llm_confidence: str
+    justification: str
+    is_truthful: bool

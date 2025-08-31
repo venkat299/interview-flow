@@ -4,12 +4,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from ai_orchestration_service.ai_orchestration import (
     generate_next_question,
     create_interview_blueprint,
+    evaluate_candidate_answer,
 )
 from ai_orchestration_service.schemas import (
     InterviewRequest,
     InterviewResponse,
     InterviewContext,
     InterviewBlueprintResponse,
+    EvaluationRequest,
+    EvaluationResponse,
 )
 
 app = FastAPI(title="AI Orchestration Service")
@@ -26,7 +29,7 @@ app.add_middleware(
 @app.post("/generate-question", response_model=InterviewResponse)
 async def generate_question(request: InterviewRequest) -> InterviewResponse:
     """Generate the next interview question."""
-    question = await generate_next_question(request.context, request.history)
+    question = await generate_next_question(request)
     return InterviewResponse(question_text=question)
 
 
@@ -36,6 +39,12 @@ async def create_blueprint_endpoint(
 ) -> InterviewBlueprintResponse:
     """Create a detailed interview blueprint."""
     return await create_interview_blueprint(context)
+
+
+@app.post("/evaluate-answer", response_model=EvaluationResponse)
+async def evaluate_answer(request: EvaluationRequest) -> EvaluationResponse:
+    """Evaluate a candidate's answer to an interview question."""
+    return await evaluate_candidate_answer(request)
 
 
 # ---- Sample data endpoints (SQLite-backed) ----
