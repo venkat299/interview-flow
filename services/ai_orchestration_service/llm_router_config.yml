@@ -1,4 +1,24 @@
+# providers:
+#   openai:
+#     base_url: https://api.openai.com/v1/chat/completions
+#     api_key: dummy-key
+#     model: gpt-3.5-turbo
+
+# tasks:
+#   blueprint_generation:
+#     provider: openai
+#     model: gpt-3.5-turbo
+#   question_generation:
+#     provider: openai
+#     model: gpt-3.5-turbo
 providers:
+  # Local OpenAI-compatible server (e.g., LM Studio, Ollama, vLLM, OpenAI-compatible proxy)
+  local:
+    base_url: https://8cb5852bd7fb.ngrok-free.app/v1/chat/completions
+    api_key: ""
+    model: openai/gpt-oss-20b
+
+  # Optional: keep OpenAI config for fallback/manual switching
   openai:
     base_url: https://api.openai.com/v1/chat/completions
     api_key: dummy-key
@@ -6,8 +26,8 @@ providers:
 
 tasks:
   blueprint_generation:
-    provider: openai
-    model: gpt-3.5-turbo
+    provider: local
   question_generation:
-    provider: openai
-    model: gpt-3.5-turbo
+    provider: local
+  answer_evaluation:
+    provider: local

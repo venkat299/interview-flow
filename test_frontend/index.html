@@ -21,6 +21,8 @@
     <script>
 
     const AI_SERVICE_URL = 'http://localhost:8003';
+    // Share with chat page
+    try { sessionStorage.setItem('AI_SERVICE_URL', AI_SERVICE_URL); } catch (e) {}
     const select = document.getElementById('prefill-select');
 
     async function loadSamples() {
