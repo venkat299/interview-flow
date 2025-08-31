@@ -10,7 +10,11 @@ from fastapi import WebSocket
 
 logger = logging.getLogger(__name__)
 
-AI_API_URL = os.getenv("AI_ORCHESTRATION_URL")
+# Base URL for the AI orchestration service. Falls back to the default docker-compose
+# configuration when the environment variable is unset.
+AI_API_URL = os.getenv(
+    "AI_ORCHESTRATION_URL", "http://localhost:8001/api/v1/interview"
+)
 USE_DIRECT = os.getenv("AI_ORCHESTRATION_USE_DIRECT", "false").lower() == "true"
 
 if USE_DIRECT:
