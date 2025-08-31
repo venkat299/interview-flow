@@ -1,4 +1,4 @@
-document.addEventListener("DOMContentLoaded", () => {
+function initChat() {
     const chatLog = document.getElementById('chat-log');
     const chatInput = document.getElementById('chat-input');
     const sendButton = document.getElementById('send-button');
@@ -50,10 +50,12 @@ document.addEventListener("DOMContentLoaded", () => {
             statusIndicator.textContent = 'Connected';
             chatInput.disabled = false;
             sendButton.disabled = false;
-            if (endButton) endButton.disabled = false;
+            if (endButton) endButton.disabled = false; // redundant but explicit
         } catch (err) {
             console.error(err);
             statusIndicator.textContent = 'Error contacting service';
+            // Still allow ending the interview even if the service failed
+            if (endButton) endButton.disabled = false;
         }
     }
 
@@ -91,5 +93,17 @@ document.addEventListener("DOMContentLoaded", () => {
         endButton.addEventListener('click', endInterview);
     }
 
+    // Ensure the End Interview button is always available
+    if (endButton) {
+        endButton.disabled = false;
+        endButton.removeAttribute('disabled');
+    }
     startInterview();
-});
+}
+
+// Run immediately if DOM already loaded, otherwise wait
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initChat);
+} else {
+    initChat();
+}
