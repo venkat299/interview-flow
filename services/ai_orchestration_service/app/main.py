@@ -3,13 +3,13 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from ai_orchestration_service.ai_orchestration import (
     generate_next_question,
-    determine_topics,
+    create_interview_blueprint,
 )
 from ai_orchestration_service.schemas import (
     InterviewRequest,
     InterviewResponse,
     InterviewContext,
-    TopicsResponse,
+    InterviewBlueprintResponse,
 )
 
 app = FastAPI(title="AI Orchestration Service")
@@ -30,11 +30,12 @@ async def generate_question(request: InterviewRequest) -> InterviewResponse:
     return InterviewResponse(question_text=question)
 
 
-@app.post("/determine-topics", response_model=TopicsResponse)
-async def determine_topics_endpoint(context: InterviewContext) -> TopicsResponse:
-    """Infer interview topics from job description and resume."""
-    topics = await determine_topics(context)
-    return TopicsResponse(topics=topics)
+@app.post("/create-blueprint", response_model=InterviewBlueprintResponse)
+async def create_blueprint_endpoint(
+    context: InterviewContext,
+) -> InterviewBlueprintResponse:
+    """Create a detailed interview blueprint."""
+    return await create_interview_blueprint(context)
 
 
 # ---- Sample data endpoints (SQLite-backed) ----

@@ -4,7 +4,12 @@ from typing import List
 import httpx
 
 from .config import settings
-from .schemas import ConversationTurn, InterviewContext
+from .schemas import (
+    ConversationTurn,
+    InterviewContext,
+    InterviewBlueprintResponse,
+)
+from .ai_gateway import gateway
 
 
 async def generate_next_question(
@@ -54,10 +59,33 @@ async def generate_next_question(
     return data["choices"][0]["message"]["content"].strip()
 
 
-async def determine_topics(context: InterviewContext) -> List[str]:
-    """Infer interview topics from job description and resume."""
+async def create_interview_blueprint(context: InterviewContext) -> InterviewBlueprintResponse:
+    """Generate a structured interview blueprint via the AI Gateway."""
 
-    text = f"{context.job_description} {context.candidate_resume or ''}".lower()
-    keywords = ["python", "javascript", "java", "frontend", "backend", "database", "data science", "machine learning"]
-    topics = [word for word in keywords if word in text]
-    return topics or ["general"]
+    system_prompt = (
+        "You are a world-class technical architect and hiring manager. "
+        "Your task is to analyze a job description and a candidate's resume "
+        "to create a comprehensive 'Interview Blueprint'. Your analysis must be "
+        "objective and strictly based on the provided texts.\n\n"
+        "Perform the following actions:\n"
+        "1.  Infer a suitable `interview_title` for this role.\n"
+        "2.  Infer the candidate's `experience_level` based on their resume (e.g., 'Junior', 'Mid-Level', 'Senior').\n"
+        "3.  Identify the 5-7 most critical technical `topics`. For each topic:\n"
+        "    a.  Assign a `relevance_to_role` score (0-10) based only on the job description.\n"
+        "    b.  Determine the `required_depth` ('Fundamental', 'Intermediate', 'Advanced', 'Expert') based on the job's seniority.\n"
+        "    c.  Extract verbatim `jd_context` phrases that justify the topic's inclusion and relevance.\n"
+        "    d.  Extract verbatim `resume_evidence` phrases that suggest the candidate's proficiency.\n\n"
+        "Respond ONLY with a single, valid JSON object that strictly adheres to the 'InterviewBlueprintResponse' schema."
+    )
+    user_prompt = (
+        f"Job description:\n{context.job_description}\n\n"
+        f"Candidate resume:\n{context.candidate_resume or ''}"
+    )
+
+    data = await gateway.execute_task(
+        task_name="blueprint_generation",
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+    )
+
+    return InterviewBlueprintResponse.model_validate(data)

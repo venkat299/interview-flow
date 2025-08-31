@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 from ai_orchestration_service.app.main import app
 from ai_orchestration_service.config import settings
+from ai_orchestration_service.ai_gateway import gateway
 
 
 @pytest.fixture
@@ -37,11 +38,20 @@ def test_generate_question_endpoint(monkeypatch, client):
     assert resp.json() == {"question_text": "Sample?"}
 
 
-def test_determine_topics_endpoint(client):
+def test_create_blueprint_endpoint(monkeypatch, client):
+    async def fake_execute(task_name, system_prompt, user_prompt=None):
+        return {
+            "interview_title": "Backend Developer Interview",
+            "experience_level": "Senior",
+            "topics": [],
+        }
+
+    monkeypatch.setattr(gateway, "execute_task", fake_execute)
+
     payload = {
         "job_description": "Looking for Python developer",
         "candidate_resume": "Experience with databases",
     }
-    resp = client.post("/determine-topics", json=payload)
+    resp = client.post("/create-blueprint", json=payload)
     assert resp.status_code == 200
-    assert resp.json() == {"topics": ["python", "database"]}
+    assert resp.json()["interview_title"] == "Backend Developer Interview"

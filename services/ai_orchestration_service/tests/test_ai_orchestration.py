@@ -7,7 +7,11 @@ import httpx
 import pytest
 
 from ai_orchestration_service import ai_orchestration as ai
-from ai_orchestration_service.schemas import InterviewContext, ConversationTurn
+from ai_orchestration_service.schemas import (
+    InterviewContext,
+    ConversationTurn,
+    InterviewBlueprintResponse,
+)
 from ai_orchestration_service.config import settings
 
 
@@ -39,16 +43,34 @@ async def test_generate_question(monkeypatch):
     assert question == "What is your experience with Python?"
 
 
+
 @pytest.mark.asyncio
-async def test_determine_topics():
-    topics = await ai.determine_topics(
-        InterviewContext(
-            job_description="Looking for Python developer",
-            candidate_resume="Experience with databases",
-        )
+async def test_create_interview_blueprint(monkeypatch):
+    async def fake_execute(task_name, system_prompt, user_prompt=None):
+        assert task_name == "blueprint_generation"
+        return {
+            "interview_title": "Backend Developer Interview",
+            "experience_level": "Senior",
+            "topics": [
+                {
+                    "name": "python",
+                    "relevance_to_role": 10,
+                    "required_depth": "Advanced",
+                    "jd_context": ["python"],
+                    "resume_evidence": ["python"],
+                }
+            ],
+        }
+
+    monkeypatch.setattr(ai.gateway, "execute_task", fake_execute)
+
+    blueprint = await ai.create_interview_blueprint(
+        InterviewContext(job_description="Backend dev", candidate_resume="Python exp")
     )
 
-    assert topics == ["python", "database"]
+    assert isinstance(blueprint, InterviewBlueprintResponse)
+    assert blueprint.interview_title == "Backend Developer Interview"
+    assert blueprint.topics[0].name == "python"
 
 
 @pytest.mark.asyncio

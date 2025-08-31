@@ -1,11 +1,13 @@
 """Session management for interview WebSocket service."""
 from typing import Dict, List
 
+import asyncio
 import httpx
 from fastapi import WebSocket
 
 from .config import settings
 from .schemas import ConversationTurn, InterviewContext
+from .interview_state import InterviewState
 
 
 class ConnectionManager:
@@ -14,6 +16,7 @@ class ConnectionManager:
     def __init__(self) -> None:
         self.history: Dict[WebSocket, List[dict]] = {}
         self.contexts: Dict[WebSocket, dict] = {}
+        self.states: Dict[WebSocket, InterviewState] = {}
 
     async def connect(self, websocket: WebSocket) -> None:
         await websocket.accept()
@@ -36,9 +39,10 @@ class ConnectionManager:
                 "candidate_resume": payload.get("candidate_resume", ""),
             }
             self.contexts[websocket] = context
-            topics = await self._determine_topics(context)
+            blueprint = await self._create_blueprint(context)
+            self.states[websocket] = InterviewState(blueprint)
             await websocket.send_json({"event": "session_started"})
-            await websocket.send_json({"event": "topics", "payload": {"topics": topics}})
+            await websocket.send_json({"event": "blueprint", "payload": blueprint})
             question = await self._next_question(websocket, conversation)
             conversation.append({"role": "interviewer", "message": question})
             await websocket.send_json(
@@ -49,7 +53,12 @@ class ConnectionManager:
             answer = data.get("payload", {}).get("answer_text", "")
             conversation.append({"role": "candidate", "message": answer})
             await websocket.send_json({"event": "interviewer_typing"})
-            question = await self._next_question(websocket, conversation)
+            state = self.states.get(websocket)
+            eval_task = self._evaluate_answer(state, conversation)
+            question_task = self._next_question(websocket, conversation)
+            evaluation_result, question = await asyncio.gather(eval_task, question_task)
+            if state:
+                state.update_state_after_answer(evaluation_result)
             conversation.append({"role": "interviewer", "message": question})
             await websocket.send_json(
                 {"event": "new_question", "payload": {"question_text": question}}
@@ -69,12 +78,25 @@ class ConnectionManager:
             data = resp.json()
         return data.get("question_text", "")
 
-    async def _determine_topics(self, context: dict) -> List[str]:
+    async def _create_blueprint(self, context: dict) -> dict:
         payload = InterviewContext(**context).model_dump()
         async with httpx.AsyncClient(timeout=settings.ai_timeout) as client:
             resp = await client.post(
-                f"{settings.ai_service_url}/determine-topics", json=payload
+                f"{settings.ai_service_url}/create-blueprint", json=payload
             )
             resp.raise_for_status()
             data = resp.json()
-        return data.get("topics", [])
+        return data
+
+    async def _evaluate_answer(self, state: InterviewState, history: List[dict]) -> dict:
+        payload = {
+            "history": [ConversationTurn(**t).model_dump() for t in history],
+            "topic": state.current_topic if state else None,
+        }
+        async with httpx.AsyncClient(timeout=settings.ai_timeout) as client:
+            resp = await client.post(
+                f"{settings.ai_service_url}/evaluate-answer", json=payload
+            )
+            resp.raise_for_status()
+            data = resp.json()
+        return data
