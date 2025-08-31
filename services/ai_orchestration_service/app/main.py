@@ -1,18 +1,18 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from interview_services.ai_interview_service import (
+from ai_orchestration_service.ai_orchestration import (
     generate_next_question,
     determine_topics,
 )
-from interview_services.schemas import (
+from ai_orchestration_service.schemas import (
     InterviewRequest,
     InterviewResponse,
     InterviewContext,
     TopicsResponse,
 )
 
-app = FastAPI(title="Interview Service")
+app = FastAPI(title="AI Orchestration Service")
 
 app.add_middleware(
     CORSMiddleware,
@@ -38,7 +38,7 @@ async def determine_topics_endpoint(context: InterviewContext) -> TopicsResponse
 
 
 # ---- Sample data endpoints (SQLite-backed) ----
-from interview_services import sample_data_repo as samples
+from ai_orchestration_service import sample_data_repo as samples
 
 
 @app.on_event("startup")

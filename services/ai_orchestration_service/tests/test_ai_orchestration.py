@@ -6,9 +6,9 @@ sys.path.append(str(Path(__file__).resolve().parents[2]))
 import httpx
 import pytest
 
-from interview_services import ai_interview_service as ai
-from interview_services.schemas import InterviewContext, ConversationTurn
-from interview_services.config import settings
+from ai_orchestration_service import ai_orchestration as ai
+from ai_orchestration_service.schemas import InterviewContext, ConversationTurn
+from ai_orchestration_service.config import settings
 
 
 @pytest.mark.asyncio

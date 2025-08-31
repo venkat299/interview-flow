@@ -1,0 +1,18 @@
+FROM python:3.12-slim
+
+WORKDIR /code
+ENV PYTHONPATH=/code
+
+COPY pyproject.toml /tmp/pyproject.toml
+RUN python - <<'PY'
+import tomllib, pathlib
+with open('/tmp/pyproject.toml', 'rb') as f:
+    deps = tomllib.load(f)['project']['dependencies']
+pathlib.Path('/tmp/requirements.txt').write_text('\n'.join(deps))
+PY
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
+RUN rm /tmp/requirements.txt /tmp/pyproject.toml
+
+COPY . /code/interview_session_service
+
+CMD ["uvicorn", "interview_session_service.app.main:app", "--host", "0.0.0.0", "--port", "8000"]

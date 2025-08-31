@@ -1,7 +1,7 @@
 FROM python:3.12-slim
 
-# Place the code under /code/interview_services so that the package
-# "interview_services" is importable without extra path tweaks.
+# Place the code under /code/ai_orchestration_service so that the package
+# "ai_orchestration_service" is importable without extra path tweaks.
 WORKDIR /code
 ENV PYTHONPATH=/code
 
@@ -16,7 +16,7 @@ PY
 RUN pip install --no-cache-dir -r /tmp/requirements.txt
 RUN rm /tmp/requirements.txt /tmp/pyproject.toml
 
-COPY . /code/interview_services
+COPY . /code/ai_orchestration_service
 
-CMD ["uvicorn", "interview_services.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "ai_orchestration_service.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 

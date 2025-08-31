@@ -4,7 +4,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const sendButton = document.getElementById('send-button');
     const statusIndicator = document.getElementById('status-indicator');
 
-    const apiBase = 'http://localhost:8003';
+    // Base URL of the AI orchestration service
+    const AI_SERVICE_URL = 'http://localhost:8003';
     const context = {
         job_description: sessionStorage.getItem('job_description') || '',
         candidate_resume: sessionStorage.getItem('candidate_resume') || ''
@@ -20,7 +21,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     async function determineTopics() {
-        const resp = await fetch(`${apiBase}/determine-topics`, {
+        const resp = await fetch(`${AI_SERVICE_URL}/determine-topics`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(context)
@@ -30,7 +31,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     async function askNextQuestion() {
-        const resp = await fetch(`${apiBase}/generate-question`, {
+        const resp = await fetch(`${AI_SERVICE_URL}/generate-question`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ context, history })

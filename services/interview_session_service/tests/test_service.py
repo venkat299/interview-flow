@@ -1,11 +1,13 @@
 import sys
 from pathlib import Path
+import sys
+from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 import pytest
 
-from interview_services import interview_session_service as session
+from interview_session_service import service as session
 
 
 class DummyWebSocket:
@@ -21,14 +23,14 @@ class DummyWebSocket:
 
 @pytest.mark.asyncio
 async def test_join_session_sends_first_question(monkeypatch):
-    async def fake_question(context, turns):
+    async def fake_question(self, websocket, history):
         return "First question?"
 
-    async def fake_topics(context):
+    async def fake_topics(self, context):
         return ["python"]
 
-    monkeypatch.setattr(session, "generate_next_question", fake_question)
-    monkeypatch.setattr(session, "determine_topics", fake_topics)
+    monkeypatch.setattr(session.ConnectionManager, "_next_question", fake_question)
+    monkeypatch.setattr(session.ConnectionManager, "_determine_topics", fake_topics)
 
     ws = DummyWebSocket()
     manager = session.ConnectionManager()
@@ -56,14 +58,14 @@ async def test_join_session_sends_first_question(monkeypatch):
 async def test_send_answer_triggers_followup(monkeypatch):
     questions = iter(["First question?", "Second question?"])
 
-    async def fake_question(context, turns):
+    async def fake_question(self, websocket, history):
         return next(questions)
 
-    async def fake_topics(context):
+    async def fake_topics(self, context):
         return ["python"]
 
-    monkeypatch.setattr(session, "generate_next_question", fake_question)
-    monkeypatch.setattr(session, "determine_topics", fake_topics)
+    monkeypatch.setattr(session.ConnectionManager, "_next_question", fake_question)
+    monkeypatch.setattr(session.ConnectionManager, "_determine_topics", fake_topics)
 
     ws = DummyWebSocket()
     manager = session.ConnectionManager()

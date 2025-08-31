@@ -7,8 +7,8 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from interview_services.app.main import app
-from interview_services.config import settings
+from ai_orchestration_service.app.main import app
+from ai_orchestration_service.config import settings
 
 
 @pytest.fixture

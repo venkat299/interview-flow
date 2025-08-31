@@ -20,12 +20,12 @@
     </div>
     <script>
 
-    const apiBase = 'http://localhost:8003';
+    const AI_SERVICE_URL = 'http://localhost:8003';
     const select = document.getElementById('prefill-select');
 
     async function loadSamples() {
         try {
-            const resp = await fetch(`${apiBase}/samples`);
+            const resp = await fetch(`${AI_SERVICE_URL}/samples`);
             const data = await resp.json();
             const items = data.items || [];
             for (const item of items) {
@@ -47,7 +47,7 @@
             return;
         }
         try {
-            const resp = await fetch(`${apiBase}/samples/${encodeURIComponent(key)}`);
+            const resp = await fetch(`${AI_SERVICE_URL}/samples/${encodeURIComponent(key)}`);
             const item = await resp.json();
             document.getElementById('job-description').value = item.job_description || '';
             document.getElementById('resume').value = item.resume || '';

@@ -1,9 +1,10 @@
-"""Session management for interviews without HTTP calls."""
+"""Session management for interview WebSocket service."""
 from typing import Dict, List
 
+import httpx
 from fastapi import WebSocket
 
-from .ai_interview_service import generate_next_question, determine_topics
+from .config import settings
 from .schemas import ConversationTurn, InterviewContext
 
 
@@ -56,10 +57,24 @@ class ConnectionManager:
 
     async def _next_question(self, websocket: WebSocket, history: List[dict]) -> str:
         context = self.contexts.get(websocket, {"job_description": ""})
-        interview_context = InterviewContext(**context)
-        turns = [ConversationTurn(**t) for t in history]
-        return await generate_next_question(interview_context, turns)
+        payload = {
+            "context": InterviewContext(**context).model_dump(),
+            "history": [ConversationTurn(**t).model_dump() for t in history],
+        }
+        async with httpx.AsyncClient(timeout=settings.ai_timeout) as client:
+            resp = await client.post(
+                f"{settings.ai_service_url}/generate-question", json=payload
+            )
+            resp.raise_for_status()
+            data = resp.json()
+        return data.get("question_text", "")
 
     async def _determine_topics(self, context: dict) -> List[str]:
-        interview_context = InterviewContext(**context)
-        return await determine_topics(interview_context)
+        payload = InterviewContext(**context).model_dump()
+        async with httpx.AsyncClient(timeout=settings.ai_timeout) as client:
+            resp = await client.post(
+                f"{settings.ai_service_url}/determine-topics", json=payload
+            )
+            resp.raise_for_status()
+            data = resp.json()
+        return data.get("topics", [])
