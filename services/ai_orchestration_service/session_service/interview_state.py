@@ -16,6 +16,7 @@ class InterviewState:
         self.current_topic: Optional[Dict] = None
         self.difficulty: str = "Fundamental"
         self.performance_log: List[Dict] = []
+        self.current_phase: str = "introduction"
 
     def get_next_topic(self) -> Optional[Dict]:
         """Pop the next topic from the queue and reset difficulty."""
@@ -36,6 +37,13 @@ class InterviewState:
             self.difficulty = "Intermediate"
         else:
             self.difficulty = "Fundamental"
+
+    def advance_phase(self) -> None:
+        """Move to the next phase in the interview flow."""
+        if self.current_phase == "introduction":
+            self.current_phase = "soft_skills"
+        elif self.current_phase == "soft_skills":
+            self.current_phase = "technical"
 
     def should_switch_topic(self) -> bool:
         """Decide whether to switch to the next topic."""

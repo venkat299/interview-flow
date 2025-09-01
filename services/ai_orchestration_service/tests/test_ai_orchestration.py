@@ -96,3 +96,29 @@ async def test_evaluate_candidate_answer(monkeypatch):
     resp = await ai.evaluate_candidate_answer(req)
     assert isinstance(resp, EvaluationResponse)
     assert resp.score == 8
+
+
+@pytest.mark.asyncio
+async def test_generate_introductory_question(monkeypatch):
+    async def fake_execute(task_name, system_prompt, user_prompt=None):
+        assert task_name == "question_generation"
+        assert "introduce themselves" in system_prompt
+        return {"question_text": "Tell me about yourself."}
+
+    monkeypatch.setattr(ai.gateway, "execute_task", fake_execute)
+
+    question = await ai.generate_introductory_question()
+    assert question == "Tell me about yourself."
+
+
+@pytest.mark.asyncio
+async def test_generate_soft_skill_question(monkeypatch):
+    async def fake_execute(task_name, system_prompt, user_prompt=None):
+        assert task_name == "question_generation"
+        assert "Resume: My Resume" in system_prompt
+        return {"question_text": "Describe a time you worked on a team."}
+
+    monkeypatch.setattr(ai.gateway, "execute_task", fake_execute)
+
+    question = await ai.generate_soft_skill_question("My Resume")
+    assert question == "Describe a time you worked on a team."

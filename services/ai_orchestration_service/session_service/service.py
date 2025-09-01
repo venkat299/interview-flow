@@ -16,6 +16,8 @@ from ai_orchestration_service.ai_orchestration import (
     generate_next_question,
     create_interview_blueprint,
     evaluate_candidate_answer,
+    generate_introductory_question,
+    generate_soft_skill_question,
 )
 from .interview_state import InterviewState
 from .database import create_session, log_turn, end_session
@@ -127,18 +129,19 @@ class ConnectionManager:
             self.word_count[websocket] = self.word_count.get(websocket, 0) + len(answer.split())
             await websocket.send_json({"event": "interviewer_typing"})
             state = self.states.get(websocket)
-            # Evaluate based on last question and current topic
-            evaluation_result = await self._evaluate_answer(state, conversation, websocket, answer)
-            if state:
+            if state and state.current_phase == "technical":
+                evaluation_result = await self._evaluate_answer(state, conversation, websocket, answer)
                 state.update_state_after_answer(evaluation_result)
+            else:
+                evaluation_result = {}
             if session_id:
-                log_turn(session_id, "candidate", answer, evaluation_result)
-            # Send evaluation details so clients can update rubric/summary
+                log_turn(session_id, "candidate", answer, evaluation_result or None)
             await websocket.send_json({"event": "evaluation", "payload": evaluation_result})
             if self._limits_exceeded(websocket):
                 await self._force_end(websocket)
                 return
-            # Next question
+            if state:
+                state.advance_phase()
             question = await self._next_question(websocket, conversation)
             conversation.append({"role": "interviewer", "message": question})
             self.last_question[websocket] = question
@@ -195,6 +198,11 @@ class ConnectionManager:
     async def _next_question(self, websocket: WebSocket, history: List[dict]) -> str:
         context_dict = self.contexts.get(websocket, {"job_description": ""})
         state = self.states.get(websocket)
+        if state and state.current_phase == "introduction":
+            return await generate_introductory_question()
+        if state and state.current_phase == "soft_skills":
+            resume = context_dict.get("candidate_resume", "")
+            return await generate_soft_skill_question(resume)
         topic_name = (state.current_topic or {}).get("name") if state else None
         difficulty_num = self._depth_to_difficulty(state.difficulty) if state else 3
         req = InterviewRequest(

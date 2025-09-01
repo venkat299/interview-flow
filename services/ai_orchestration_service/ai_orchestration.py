@@ -11,6 +11,41 @@ from .ai_gateway import gateway
 from .personas import PERSONA_PROMPTS
 
 
+async def generate_introductory_question() -> str:
+    """Generate a welcoming introductory question."""
+
+    system_prompt = (
+        "You are an AI technical interviewer. Your first task is to ask the candidate to briefly introduce themselves. "
+        "The question should be welcoming and encourage a concise response. "
+        "Respond ONLY with a single, valid JSON object with a single key 'question_text'."
+    )
+
+    data = await gateway.execute_task(
+        task_name="question_generation",
+        system_prompt=system_prompt,
+    )
+
+    return data["question_text"]
+
+
+async def generate_soft_skill_question(candidate_resume: str) -> str:
+    """Generate a soft-skill question using the candidate's resume."""
+
+    system_prompt = (
+        "You are an AI technical interviewer. Based on the following resume, generate a soft-skill question that explores the "
+        "candidate's teamwork, communication, or problem-solving skills. The question should be open-ended but encourage a "
+        "brief response. Resume: "
+        f"{candidate_resume}. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
+    )
+
+    data = await gateway.execute_task(
+        task_name="question_generation",
+        system_prompt=system_prompt,
+    )
+
+    return data["question_text"]
+
+
 async def generate_next_question(request: InterviewRequest) -> str:
     """Generate the next interview question using the AI Gateway."""
 
