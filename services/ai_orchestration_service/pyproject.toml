@@ -13,5 +13,6 @@ dependencies = [
     "pytest>=8.4.1",
     "pytest-asyncio>=1.1.0",
     "PyYAML>=6.0.2",
+    "fpdf2>=2.7.0",
 ]
 

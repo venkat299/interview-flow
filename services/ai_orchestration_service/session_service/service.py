@@ -286,7 +286,10 @@ class ConnectionManager:
             topic_blueprint=TopicBlueprint(**topic_dict),
         )
         result = await evaluate_candidate_answer(eval_req)
-        return result.model_dump()
+        data = result.model_dump()
+        data["topic"] = topic_dict.get("name") if isinstance(topic_dict, dict) else None
+        data["difficulty"] = self._depth_to_difficulty(state.difficulty)
+        return data
 
     @staticmethod
     def _depth_to_difficulty(depth: str) -> int:

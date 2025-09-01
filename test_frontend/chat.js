@@ -4,6 +4,7 @@ function initChat() {
     const sendButton = document.getElementById('send-button');
     const skipButton = document.getElementById('skip-button');
     const endButton = document.getElementById('end-button');
+    const reportButton = document.getElementById('report-button');
     const statusText = document.getElementById('status-text');
     const statusSpinner = document.getElementById('status-spinner');
     const rubricBody = document.getElementById('rubric-body');
@@ -27,6 +28,7 @@ function initChat() {
     const topicStrength = {};
     const questionStats = {};
     let ws = null;
+    let sessionId = null;
     let interviewStart = null;
     let interviewInterval = null;
     let turnStart = null;
@@ -166,7 +168,7 @@ function initChat() {
 
     function connectWS() {
         const wsBase = toWS(ORCH_BASE);
-        const sessionId = `sess-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
+        sessionId = `sess-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
         ws = new WebSocket(`${wsBase}/api/v1/ws/${sessionId}`);
 
         ws.onopen = () => {
@@ -242,6 +244,7 @@ function initChat() {
                 sendButton.disabled = true;
                 if (skipButton) skipButton.disabled = true;
                 if (endButton) endButton.disabled = true;
+                if (reportButton) reportButton.disabled = false;
                 if (statusText) statusText.textContent = 'Interview ended';
                 stopTimers();
             }
@@ -292,6 +295,19 @@ function initChat() {
     chatInput.addEventListener('keypress', (e) => e.key === 'Enter' && sendMessage());
     if (skipButton) skipButton.addEventListener('click', skipQuestion);
     if (endButton) endButton.addEventListener('click', endInterview);
+    if (reportButton) reportButton.addEventListener('click', () => {
+        if (!sessionId) return;
+        fetch(`${ORCH_BASE}/api/v1/sessions/${sessionId}/report`).then(r => r.blob()).then(blob => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `interview_report_${sessionId}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+    });
 
     if (personaSelect) {
         const initialPersona = sessionStorage.getItem('persona') || 'friendly_mentor';

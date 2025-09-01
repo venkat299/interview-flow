@@ -79,6 +79,8 @@ from ai_orchestration_service.session_service.database import (
     get_session as db_get_session,
     get_conversation_turns as db_get_turns,
 )
+from ai_orchestration_service.session_service.report import generate_report_pdf
+from fastapi.responses import Response
 
 ws_manager = WSConnectionManager()
 
@@ -106,3 +108,18 @@ def get_session(session_id: str):
         raise HTTPException(status_code=404, detail="Session not found")
     turns = db_get_turns(session_id)
     return {**sess, "turns": turns}
+
+
+@app.get("/api/v1/sessions/{session_id}/report")
+def download_report(session_id: str):
+    sess = db_get_session(session_id)
+    if not sess:
+        raise HTTPException(status_code=404, detail="Session not found")
+    turns = db_get_turns(session_id)
+    pdf_bytes = generate_report_pdf(sess, turns)
+    filename = f"interview_report_{session_id}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
