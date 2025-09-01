@@ -3,7 +3,6 @@ function initChat() {
     const chatInput = document.getElementById('chat-input');
     const sendButton = document.getElementById('send-button');
     const endButton = document.getElementById('end-button');
-    const statusIndicator = document.getElementById('status-indicator');
     const statusText = document.getElementById('status-text');
     const statusSpinner = document.getElementById('status-spinner');
     const rubricBody = document.getElementById('rubric-body');
@@ -12,29 +11,33 @@ function initChat() {
     const statsBody = document.getElementById('stats-body');
     const personaSelect = document.getElementById('persona-select');
 
-    // HTTP base for the AI Orchestration Service
     const ORCH_BASE = sessionStorage.getItem('AI_SERVICE_URL') || 'http://localhost:8003';
-    const HTTP_TIMEOUT_MS = Number(sessionStorage.getItem('AI_HTTP_TIMEOUT')) || 60000;
-
     const context = {
         job_description: sessionStorage.getItem('job_description') || '',
         candidate_resume: sessionStorage.getItem('candidate_resume') || ''
     };
 
-    // Client-side interview state
-    const history = []; // { role: 'interviewer' | 'candidate', message: string }
+    const history = [];
     let blueprint = null;
-    let topicIndex = 0;
-    let currentDifficulty = 3; // 1-5 scale
-    let lastQuestion = '';
-    let started = false;
-    const topicStrength = {}; // { topic: { total, count } }
-    const questionStats = {}; // { topic: {1:0,2:0,3:0,4:0,5:0} }
+    let currentTopicName = null;
+    const topicStrength = {};
+    const questionStats = {};
+    let ws = null;
 
-    function setThinking(thinking) {
+    function toWS(url) {
+        try {
+            const u = new URL(url);
+            u.protocol = (u.protocol === 'https:') ? 'wss:' : 'ws:';
+            return u.toString().replace(/\/$/, '');
+        } catch (_) {
+            return url.replace(/^http/, 'ws');
+        }
+    }
+
+    function setThinking(thinking, text) {
         if (thinking) {
             if (statusSpinner) statusSpinner.classList.remove('d-none');
-            if (statusText) statusText.textContent = 'AI is thinking...';
+            if (statusText) statusText.textContent = text || 'AI is thinking...';
             chatInput.disabled = true;
             sendButton.disabled = true;
         } else {
@@ -49,7 +52,7 @@ function initChat() {
     function addMessage(sender, text) {
         const message = document.createElement('div');
         message.classList.add('message', sender);
-        message.innerHTML = marked.parse(text);
+        message.innerHTML = marked.parse(text || '');
         chatLog.appendChild(message);
         chatLog.scrollTop = chatLog.scrollHeight;
     }
@@ -107,128 +110,94 @@ function initChat() {
         statsBody.innerHTML = table;
     }
 
-    function depthToDifficulty(depth) {
-        const s = String(depth || '').toLowerCase();
-        if (s === 'fundamental' || s === 'beginner' || s === 'basic') return 1;
-        if (s === 'intermediate') return 3;
-        if (s === 'advanced') return 4;
-        if (s === 'expert') return 5;
-        return 3;
-    }
-
-    async function postJSON(path, body) {
-        const controller = new AbortController();
-        const t = setTimeout(() => controller.abort(), HTTP_TIMEOUT_MS);
-        try {
-            const resp = await fetch(`${ORCH_BASE}${path}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body),
-                signal: controller.signal,
-            });
-            if (!resp.ok) {
-                const txt = await resp.text().catch(() => '');
-                throw new Error(`HTTP ${resp.status}: ${txt || resp.statusText}`);
-            }
-            return await resp.json();
-        } finally {
-            clearTimeout(t);
-        }
-    }
-
-    function currentTopic() {
-        if (!blueprint || !Array.isArray(blueprint.topics) || blueprint.topics.length === 0) return null;
-        return blueprint.topics[Math.max(0, Math.min(topicIndex, blueprint.topics.length - 1))];
-    }
-
-    async function createBlueprint() {
-        if (statusText) statusText.textContent = 'Loading blueprint...';
-        const data = await postJSON('/create-blueprint', context);
-        blueprint = data;
-        // Initialize difficulty from the first topic
-        const t = currentTopic();
-        currentDifficulty = t ? depthToDifficulty(t.required_depth) : 3;
-        if (blueprint && Array.isArray(blueprint.topics)) {
-            blueprint.topics.forEach((tp) => {
-                topicStrength[tp.name] = { total: 0, count: 0 };
-                questionStats[tp.name] = {1:0,2:0,3:0,4:0,5:0};
-            });
-            updateSummary();
-            updateStatsTable();
-        }
-        if (endButton) endButton.disabled = false;
-        started = true;
-    }
-
-    async function generateQuestion() {
-        const t = currentTopic();
-        const req = {
-            context,
-            history,
-            current_topic: t ? t.name : 'General',
-            current_difficulty: currentDifficulty,
-            persona: sessionStorage.getItem('persona') || 'friendly_mentor',
-        };
-        const data = await postJSON('/generate-question', req);
-        const q = data && data.question_text ? String(data.question_text) : '';
-        lastQuestion = q;
-        if (q) {
-            history.push({ role: 'interviewer', message: q });
-            addMessage('interviewer', q);
-            addLog(`Asked question on ${t ? t.name : 'General'} (difficulty ${currentDifficulty})`);
-            if (t && questionStats[t.name]) {
-                questionStats[t.name][currentDifficulty] += 1;
-                updateStatsTable();
-            }
-        }
-    }
-
-    async function evaluateAnswer(answerText) {
-        const t = currentTopic();
-        if (!t || !lastQuestion) return null;
-        const req = {
-            question: lastQuestion,
-            answer: answerText,
-            topic_blueprint: t,
-        };
-        const prevDifficulty = currentDifficulty;
-        const data = await postJSON('/evaluate-answer', req).catch((e) => {
-            console.warn('Evaluation failed', e);
-            return null;
+    function initStatsFromBlueprint(bp) {
+        questionStats["General"] = {1:0,2:0,3:0,4:0,5:0};
+        (bp.topics || []).forEach(t => {
+            questionStats[t.name] = {1:0,2:0,3:0,4:0,5:0};
+            topicStrength[t.name] = { total: 0, count: 0 };
         });
-        if (data && typeof data.score === 'number') {
-            // Light-touch difficulty adjustment
-            if (data.score >= 8 && currentDifficulty < 5) currentDifficulty += 1;
-            if (data.score <= 3 && currentDifficulty > 1) currentDifficulty -= 1;
-            updateRubric(data);
-            addLog(`Answer scored ${data.score}/10`);
-            if (currentDifficulty !== prevDifficulty) {
-                addLog(`Difficulty changed from ${prevDifficulty} to ${currentDifficulty}`);
-            }
-            if (t && topicStrength[t.name]) {
-                topicStrength[t.name].total += data.score;
-                topicStrength[t.name].count += 1;
-                updateSummary();
-            }
-        }
-        return data;
+        updateStatsTable();
+        updateSummary();
     }
 
-    async function start() {
-        try {
-            await createBlueprint();
-            if (statusText) statusText.textContent = 'Connected';
-            addLog('Interview started');
-            await generateQuestion();
+    function connectWS() {
+        const wsBase = toWS(ORCH_BASE);
+        const sessionId = `sess-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
+        ws = new WebSocket(`${wsBase}/api/v1/ws/${sessionId}`);
+
+        ws.onopen = () => {
+            setThinking(true, 'Starting session...');
+            const persona = (personaSelect && personaSelect.value) || sessionStorage.getItem('persona') || 'friendly_mentor';
+            sessionStorage.setItem('persona', persona);
+            ws.send(JSON.stringify({
+                event: 'join_session',
+                payload: { job_description: context.job_description, candidate_resume: context.candidate_resume, persona }
+            }));
+        };
+
+        ws.onclose = () => {
             setThinking(false);
-        } catch (e) {
-            console.error('Failed to start interview', e);
-            if (statusSpinner) statusSpinner.classList.add('d-none');
-            if (statusText) statusText.textContent = 'Error starting interview';
-        }
+            if (statusText) statusText.textContent = 'Disconnected';
+            if (sendButton) sendButton.disabled = true;
+            if (endButton) endButton.disabled = true;
+        };
+
+        ws.onerror = () => {
+            setThinking(false);
+            if (statusText) statusText.textContent = 'Connection error';
+        };
+
+        ws.onmessage = (ev) => {
+            let msg = null;
+            try { msg = JSON.parse(ev.data); } catch (_) { return; }
+            const { event, payload } = msg || {};
+            if (event === 'session_started') {
+                if (statusText) statusText.textContent = 'Connected';
+                chatInput.disabled = false;
+                sendButton.disabled = false;
+                if (endButton) endButton.disabled = false;
+            } else if (event === 'blueprint') {
+                blueprint = payload;
+                initStatsFromBlueprint(blueprint);
+                addLog('Interview started');
+            } else if (event === 'interviewer_typing') {
+                setThinking(true);
+            } else if (event === 'evaluation') {
+                updateRubric(payload);
+                if (currentTopicName && topicStrength[currentTopicName]) {
+                    if (typeof payload.score === 'number') {
+                        topicStrength[currentTopicName].total += payload.score;
+                        topicStrength[currentTopicName].count += 1;
+                        updateSummary();
+                    }
+                }
+            } else if (event === 'new_question') {
+                const q = (payload && payload.question_text) || '';
+                const t = (payload && payload.topic) || 'General';
+                const d = (payload && payload.difficulty) || 3;
+                currentTopicName = t;
+                if (q) {
+                    history.push({ role: 'interviewer', message: q });
+                    addMessage('interviewer', q);
+                    addLog(`Asked question on ${t} (difficulty ${d})`);
+                    if (!questionStats[t]) questionStats[t] = {1:0,2:0,3:0,4:0,5:0};
+                    questionStats[t][d] = (questionStats[t][d] || 0) + 1;
+                    updateStatsTable();
+                }
+                setThinking(false);
+            } else if (event === 'interview_ended') {
+                setThinking(false);
+                addMessage('interviewer', 'Interview ended. Thank you for your time.');
+                addLog('Interview ended');
+                chatInput.disabled = true;
+                sendButton.disabled = true;
+                if (endButton) endButton.disabled = true;
+                if (statusText) statusText.textContent = 'Interview ended';
+            }
+        };
     }
 
-    async function sendMessage() {
+    function sendMessage() {
         const messageText = chatInput.value;
         if (!messageText || !messageText.trim()) return;
         addMessage('candidate', messageText);
@@ -236,20 +205,8 @@ function initChat() {
         addLog(`Candidate answered: ${messageText}`);
         chatInput.value = '';
         setThinking(true);
-        try {
-            await evaluateAnswer(messageText);
-        } catch (e) {
-            // Non-fatal; continue to next question
-            console.warn('Evaluation error', e);
-        }
-        try {
-            await generateQuestion();
-        } catch (e) {
-            console.error('Failed to get next question', e);
-            if (statusSpinner) statusSpinner.classList.add('d-none');
-            if (statusText) statusText.textContent = 'Error getting next question';
-        } finally {
-            setThinking(false);
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ event: 'send_answer', payload: { answer_text: messageText } }));
         }
     }
 
@@ -260,9 +217,10 @@ function initChat() {
         chatInput.disabled = true;
         sendButton.disabled = true;
         if (endButton) endButton.disabled = true;
-        if (statusText) statusText.textContent = 'Interview ended';
-        addMessage('interviewer', 'Interview ended. Thank you for your time.');
-        addLog('Interview ended');
+        if (statusText) statusText.textContent = 'Ending interview...';
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ event: 'end_interview' }));
+        }
     }
 
     sendButton.addEventListener('click', sendMessage);
@@ -280,9 +238,9 @@ function initChat() {
         });
     }
 
-    // Kick off
     if (statusSpinner) statusSpinner.classList.remove('d-none');
-    start();
+    if (statusText) statusText.textContent = 'Connecting...';
+    connectWS();
 }
 
 if (document.readyState === 'loading') {

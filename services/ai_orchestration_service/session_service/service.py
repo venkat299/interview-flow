@@ -1,0 +1,189 @@
+"""WebSocket session manager wired to AI orchestration functions."""
+from typing import Dict, List
+
+from fastapi import WebSocket
+
+from ai_orchestration_service.schemas import (
+    InterviewContext,
+    ConversationTurn,
+    InterviewRequest,
+    EvaluationRequest,
+    TopicBlueprint,
+)
+from ai_orchestration_service.ai_orchestration import (
+    generate_next_question,
+    create_interview_blueprint,
+    evaluate_candidate_answer,
+)
+from .interview_state import InterviewState
+from .database import create_session, log_turn, end_session
+
+
+class ConnectionManager:
+    """Connection manager for interview sessions using in-process orchestration."""
+
+    def __init__(self) -> None:
+        self.history: Dict[WebSocket, List[dict]] = {}
+        self.contexts: Dict[WebSocket, dict] = {}
+        self.states: Dict[WebSocket, InterviewState] = {}
+        self.session_ids: Dict[WebSocket, str] = {}
+        self.ended: Dict[WebSocket, bool] = {}
+        self.persona: Dict[WebSocket, str] = {}
+        self.last_question: Dict[WebSocket, str] = {}
+
+    async def connect(self, websocket: WebSocket, session_id: str) -> None:
+        await websocket.accept()
+        self.history[websocket] = []
+        self.session_ids[websocket] = session_id
+        self.ended[websocket] = False
+
+    def disconnect(self, websocket: WebSocket) -> None:
+        session_id = self.session_ids.get(websocket)
+        state = self.states.get(websocket)
+        if session_id and not self.ended.get(websocket):
+            rubric = {"performance_log": state.performance_log} if state else None
+            transcript = self.history.get(websocket) or []
+            end_session(session_id, rubric, transcript)
+        self.history.pop(websocket, None)
+        self.contexts.pop(websocket, None)
+        self.states.pop(websocket, None)
+        self.session_ids.pop(websocket, None)
+        self.ended.pop(websocket, None)
+        self.persona.pop(websocket, None)
+        self.last_question.pop(websocket, None)
+
+    async def handle_message(self, websocket: WebSocket, data: dict) -> None:
+        conversation = self.history.setdefault(websocket, [])
+        event = data.get("event")
+        session_id = self.session_ids.get(websocket)
+
+        if event == "join_session":
+            payload = data.get("payload", {})
+            context = {
+                "job_description": payload.get("job_description", ""),
+                "candidate_resume": payload.get("candidate_resume", ""),
+            }
+            persona = payload.get("persona") or "friendly_mentor"
+            self.contexts[websocket] = context
+            self.persona[websocket] = persona
+
+            # Create blueprint via orchestration
+            blueprint_model = await create_interview_blueprint(InterviewContext(**context))
+            blueprint = blueprint_model.model_dump()
+            self.states[websocket] = InterviewState(blueprint)
+            if session_id:
+                create_session(session_id, blueprint)
+            await websocket.send_json({"event": "session_started"})
+            await websocket.send_json({"event": "blueprint", "payload": blueprint})
+
+            # Prime topic and ask first question
+            state = self.states.get(websocket)
+            if state and state.get_next_topic():
+                pass  # current_topic set
+            question = await self._next_question(websocket, conversation)
+            conversation.append({"role": "interviewer", "message": question})
+            self.last_question[websocket] = question
+            if session_id:
+                log_turn(session_id, "interviewer", question)
+            # Include topic and difficulty metadata for clients
+            topic_name = (self.states.get(websocket).current_topic or {}).get("name") if self.states.get(websocket) else None
+            diff_num = self._depth_to_difficulty(self.states.get(websocket).difficulty) if self.states.get(websocket) else 3
+            await websocket.send_json(
+                {
+                    "event": "new_question",
+                    "payload": {
+                        "question_text": question,
+                        "topic": topic_name,
+                        "difficulty": diff_num,
+                    },
+                }
+            )
+
+        elif event == "send_answer":
+            answer = data.get("payload", {}).get("answer_text", "")
+            conversation.append({"role": "candidate", "message": answer})
+            await websocket.send_json({"event": "interviewer_typing"})
+            state = self.states.get(websocket)
+            # Evaluate based on last question and current topic
+            evaluation_result = await self._evaluate_answer(state, conversation, websocket, answer)
+            if state:
+                state.update_state_after_answer(evaluation_result)
+            if session_id:
+                log_turn(session_id, "candidate", answer, evaluation_result)
+            # Send evaluation details so clients can update rubric/summary
+            await websocket.send_json({"event": "evaluation", "payload": evaluation_result})
+            # Next question
+            question = await self._next_question(websocket, conversation)
+            conversation.append({"role": "interviewer", "message": question})
+            self.last_question[websocket] = question
+            if session_id:
+                log_turn(session_id, "interviewer", question)
+            topic_name = (self.states.get(websocket).current_topic or {}).get("name") if self.states.get(websocket) else None
+            diff_num = self._depth_to_difficulty(self.states.get(websocket).difficulty) if self.states.get(websocket) else 3
+            await websocket.send_json(
+                {
+                    "event": "new_question",
+                    "payload": {
+                        "question_text": question,
+                        "topic": topic_name,
+                        "difficulty": diff_num,
+                    },
+                }
+            )
+
+        elif event == "end_interview":
+            state = self.states.get(websocket)
+            rubric = {"performance_log": state.performance_log} if state else None
+            if session_id:
+                transcript = list(self.history.get(websocket) or [])
+                end_session(session_id, rubric, transcript)
+            self.ended[websocket] = True
+            await websocket.send_json({"event": "interview_ended"})
+            await websocket.close()
+
+    async def _next_question(self, websocket: WebSocket, history: List[dict]) -> str:
+        context_dict = self.contexts.get(websocket, {"job_description": ""})
+        state = self.states.get(websocket)
+        topic_name = (state.current_topic or {}).get("name") if state else None
+        difficulty_num = self._depth_to_difficulty(state.difficulty) if state else 3
+        req = InterviewRequest(
+            context=InterviewContext(**context_dict),
+            history=[ConversationTurn(**t) for t in history],
+            current_topic=topic_name or "General",
+            current_difficulty=difficulty_num,
+            persona=self.persona.get(websocket) or "friendly_mentor",
+        )
+        question = await generate_next_question(req)
+        return question
+
+    async def _evaluate_answer(
+        self,
+        state: InterviewState,
+        history: List[dict],
+        websocket: WebSocket,
+        answer: str,
+    ) -> dict:
+        last_q = self.last_question.get(websocket) or ""
+        topic_dict = state.current_topic if state else None
+        if not topic_dict:
+            return {"score": 0, "assessed_depth": "Intermediate", "llm_confidence": "Low", "justification": "No topic selected.", "is_truthful": True}
+        eval_req = EvaluationRequest(
+            question=last_q,
+            answer=answer,
+            topic_blueprint=TopicBlueprint(**topic_dict),
+        )
+        result = await evaluate_candidate_answer(eval_req)
+        return result.model_dump()
+
+    @staticmethod
+    def _depth_to_difficulty(depth: str) -> int:
+        s = str(depth or "").lower()
+        if s in ("fundamental", "beginner", "basic"):
+            return 1
+        if s == "intermediate":
+            return 3
+        if s == "advanced":
+            return 4
+        if s == "expert":
+            return 5
+        return 3

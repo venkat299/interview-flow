@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from ai_orchestration_service.ai_orchestration import (
@@ -68,3 +68,41 @@ def get_sample(key: str):
     if not item:
         raise HTTPException(status_code=404, detail="Sample not found")
     return item
+
+
+# ---- Integrated WebSocket + Session retrieval endpoints ----
+from ai_orchestration_service.session_service.service import (
+    ConnectionManager as WSConnectionManager,
+)
+from ai_orchestration_service.session_service.database import (
+    list_sessions as db_list_sessions,
+    get_session as db_get_session,
+    get_conversation_turns as db_get_turns,
+)
+
+ws_manager = WSConnectionManager()
+
+
+@app.websocket("/api/v1/ws/{session_id}")
+async def websocket_endpoint(websocket: WebSocket, session_id: str) -> None:
+    await ws_manager.connect(websocket, session_id)
+    try:
+        while True:
+            data = await websocket.receive_json()
+            await ws_manager.handle_message(websocket, data)
+    except WebSocketDisconnect:
+        ws_manager.disconnect(websocket)
+
+
+@app.get("/api/v1/sessions")
+def list_sessions():
+    return {"items": db_list_sessions()}
+
+
+@app.get("/api/v1/sessions/{session_id}")
+def get_session(session_id: str):
+    sess = db_get_session(session_id)
+    if not sess:
+        raise HTTPException(status_code=404, detail="Session not found")
+    turns = db_get_turns(session_id)
+    return {**sess, "turns": turns}

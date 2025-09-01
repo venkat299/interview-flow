@@ -1,4 +1,4 @@
-"""State management for an active interview session."""
+"""State management for an active interview session (embedded)."""
 from collections import deque
 from typing import Deque, Dict, List, Optional
 
