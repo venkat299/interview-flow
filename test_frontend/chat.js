@@ -6,6 +6,8 @@ function initChat() {
     const statusIndicator = document.getElementById('status-indicator');
     const statusText = document.getElementById('status-text');
     const statusSpinner = document.getElementById('status-spinner');
+    const rubricBody = document.getElementById('rubric-body');
+    const logBody = document.getElementById('log-body');
 
     // HTTP base for the AI Orchestration Service
     const ORCH_BASE = sessionStorage.getItem('AI_SERVICE_URL') || 'http://localhost:8003';
@@ -45,6 +47,26 @@ function initChat() {
         message.innerHTML = marked.parse(text);
         chatLog.appendChild(message);
         chatLog.scrollTop = chatLog.scrollHeight;
+    }
+
+    function updateRubric(data) {
+        if (!rubricBody || !data) return;
+        rubricBody.innerHTML = `
+            <div><strong>Score:</strong> ${data.score}/10</div>
+            <div><strong>Depth:</strong> ${data.assessed_depth}</div>
+            <div><strong>Confidence:</strong> ${data.llm_confidence}</div>
+            <div><strong>Truthful:</strong> ${data.is_truthful ? 'Yes' : 'No'}</div>
+            <div><strong>Justification:</strong> ${data.justification}</div>
+        `;
+    }
+
+    function addLog(text) {
+        if (!logBody) return;
+        const entry = document.createElement('div');
+        entry.classList.add('small', 'text-muted');
+        entry.textContent = text;
+        logBody.appendChild(entry);
+        logBody.scrollTop = logBody.scrollHeight;
     }
 
     function depthToDifficulty(depth) {
@@ -107,6 +129,7 @@ function initChat() {
         if (q) {
             history.push({ role: 'interviewer', message: q });
             addMessage('interviewer', q);
+            addLog(`Asked question on ${t ? t.name : 'General'} (difficulty ${currentDifficulty})`);
         }
     }
 
@@ -118,6 +141,7 @@ function initChat() {
             answer: answerText,
             topic_blueprint: t,
         };
+        const prevDifficulty = currentDifficulty;
         const data = await postJSON('/evaluate-answer', req).catch((e) => {
             console.warn('Evaluation failed', e);
             return null;
@@ -126,6 +150,11 @@ function initChat() {
             // Light-touch difficulty adjustment
             if (data.score >= 8 && currentDifficulty < 5) currentDifficulty += 1;
             if (data.score <= 3 && currentDifficulty > 1) currentDifficulty -= 1;
+            updateRubric(data);
+            addLog(`Answer scored ${data.score}/10`);
+            if (currentDifficulty !== prevDifficulty) {
+                addLog(`Difficulty changed from ${prevDifficulty} to ${currentDifficulty}`);
+            }
         }
         return data;
     }
@@ -134,6 +163,7 @@ function initChat() {
         try {
             await createBlueprint();
             if (statusText) statusText.textContent = 'Connected';
+            addLog('Interview started');
             await generateQuestion();
             setThinking(false);
         } catch (e) {
@@ -148,6 +178,7 @@ function initChat() {
         if (!messageText || !messageText.trim()) return;
         addMessage('candidate', messageText);
         history.push({ role: 'candidate', message: messageText });
+        addLog(`Candidate answered: ${messageText}`);
         chatInput.value = '';
         setThinking(true);
         try {
@@ -176,6 +207,7 @@ function initChat() {
         if (endButton) endButton.disabled = true;
         if (statusText) statusText.textContent = 'Interview ended';
         addMessage('interviewer', 'Interview ended. Thank you for your time.');
+        addLog('Interview ended');
     }
 
     sendButton.addEventListener('click', sendMessage);
