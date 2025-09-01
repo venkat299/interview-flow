@@ -38,6 +38,31 @@ async def test_generate_question(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_generate_question_with_hint_and_type(monkeypatch):
+    """Ensure dynamic prompt includes hint instruction and question type."""
+
+    async def fake_execute(task_name, system_prompt, user_prompt=None):
+        assert task_name == "question_generation"
+        assert "subtle hint" in system_prompt
+        assert "Question Type" in system_prompt
+        return {"question_text": "Sample question", "question_type": "yes/no"}
+
+    monkeypatch.setattr(ai.gateway, "execute_task", fake_execute)
+
+    req = InterviewRequest(
+        context=InterviewContext(job_description="Backend"),
+        history=[],
+        current_topic="python",
+        current_difficulty=1,
+        persona="friendly_mentor",
+        needs_hint=True,
+    )
+
+    question = await ai.generate_next_question(req)
+    assert question == "Sample question"
+
+
+@pytest.mark.asyncio
 async def test_create_interview_blueprint(monkeypatch):
     async def fake_execute(task_name, system_prompt, user_prompt=None):
         assert task_name == "blueprint_generation"

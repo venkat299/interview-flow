@@ -48,18 +48,47 @@ async def generate_soft_skill_question(candidate_resume: str) -> str:
 
 async def generate_next_question(request: InterviewRequest) -> str:
     """Generate the next interview question using the AI Gateway."""
-
     persona_prompt = PERSONA_PROMPTS.get(request.persona, "")
+
+    constraints = [
+        f"Topic Focus: The question MUST be about '{request.current_topic}'.",
+        (
+            f"Difficulty Level: The question's complexity MUST match the target difficulty of {request.current_difficulty}/5."
+        ),
+        (
+            "Context: The question should be a logical follow-up to the existing conversation history. Do not repeat previous questions."
+        ),
+    ]
+
+    if request.current_difficulty <= 2:
+        constraints.append("Brevity: The question must be concise and short.")
+    else:
+        constraints.append("Brevity: Keep the question focused and clear.")
+
+    if request.current_difficulty == 1:
+        constraints.append(
+            "Question Type: Randomly choose one of the following formats: yes/no, multiple choice, or short-answer. "
+            "Include a 'question_type' key indicating the chosen format."
+        )
+
+    if request.needs_hint:
+        constraints.append("Provide a subtle hint to guide the candidate within the question.")
+
+    numbered_constraints = "\n".join(
+        f"{idx + 1}.  {text}" for idx, text in enumerate(constraints)
+    )
+
     system_prompt = (
         f"{persona_prompt}\n\n"
-        "**Your Task:** Act as an AI technical interviewer. Generate the *next single question* for the candidate.\n\n"
-        "**Constraints:**\n"
-        f"1.  **Topic Focus:** The question MUST be about **'{request.current_topic}'**. Do not deviate.\n"
-        f"2.  **Difficulty Level:** The question's complexity MUST match the target difficulty of **{request.current_difficulty}/5**. (1=Introductory, 5=Expert).\n"
-        "3.  **Context:** The question should be a logical follow-up to the existing conversation history. Do not repeat previous questions.\n"
-        "4.  **Brevity:** The question must be a single, concise question.\n\n"
-        'Respond ONLY with a single, valid JSON object with a single key "question_text".'
+        "Your Task: Act as an AI technical interviewer. Generate the next single question for the candidate.\n\n"
+        f"Constraints:\n{numbered_constraints}\n\n"
+        "Respond ONLY with a single, valid JSON object with a single key 'question_text'"
     )
+
+    if request.current_difficulty == 1:
+        system_prompt += " and an optional 'question_type' key."
+    else:
+        system_prompt += "."
 
     history_lines = [f"{turn.role}: {turn.message}" for turn in request.history]
     user_prompt = "\n".join(history_lines)

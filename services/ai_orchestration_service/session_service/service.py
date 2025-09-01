@@ -1,6 +1,7 @@
 """WebSocket session manager wired to AI orchestration functions."""
 from typing import Dict, List, Optional
 
+import random
 import time
 
 from fastapi import WebSocket
@@ -211,9 +212,16 @@ class ConnectionManager:
             current_topic=topic_name or "General",
             current_difficulty=difficulty_num,
             persona=self.persona.get(websocket) or "friendly_mentor",
+            needs_hint=getattr(state, "needs_hint", False),
         )
+        feedback_options = [
+            "Great, let's move on.",
+            "Thanks for sharing. Now, let's consider this...",
+            "Good insight. Here's another one:",
+        ]
+        feedback = random.choice(feedback_options)
         question = await generate_next_question(req)
-        return question
+        return f"{feedback} {question}"
 
     async def _evaluate_answer(
         self,

@@ -25,6 +25,7 @@ class InterviewRequest(BaseModel):
     current_topic: str
     current_difficulty: int
     persona: str = "friendly_mentor"
+    needs_hint: bool = False
 
 
 class InterviewResponse(BaseModel):
