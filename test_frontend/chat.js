@@ -10,6 +10,9 @@ function initChat() {
     const summaryBody = document.getElementById('summary-body');
     const statsBody = document.getElementById('stats-body');
     const personaSelect = document.getElementById('persona-select');
+    const interviewTimerEl = document.getElementById('interview-timer');
+    const wordCounterEl = document.getElementById('word-counter');
+    const turnTimerEl = document.getElementById('turn-timer');
 
     const ORCH_BASE = sessionStorage.getItem('AI_SERVICE_URL') || 'http://localhost:8003';
     const context = {
@@ -23,6 +26,11 @@ function initChat() {
     const topicStrength = {};
     const questionStats = {};
     let ws = null;
+    let interviewStart = null;
+    let interviewInterval = null;
+    let turnStart = null;
+    let turnInterval = null;
+    let totalWords = 0;
 
     function toWS(url) {
         try {
@@ -120,6 +128,39 @@ function initChat() {
         updateSummary();
     }
 
+    function formatTime(sec) {
+        const m = Math.floor(sec / 60).toString().padStart(2, '0');
+        const s = (sec % 60).toString().padStart(2, '0');
+        return `${m}:${s}`;
+    }
+
+    function startInterviewTimer() {
+        interviewStart = Date.now();
+        if (interviewInterval) clearInterval(interviewInterval);
+        interviewInterval = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - interviewStart) / 1000);
+            if (interviewTimerEl) interviewTimerEl.textContent = formatTime(elapsed);
+        }, 1000);
+    }
+
+    function startTurnTimer() {
+        turnStart = Date.now();
+        if (turnInterval) clearInterval(turnInterval);
+        turnInterval = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - turnStart) / 1000);
+            if (turnTimerEl) turnTimerEl.textContent = formatTime(elapsed);
+        }, 1000);
+    }
+
+    function resetTurnTimer() {
+        startTurnTimer();
+    }
+
+    function stopTimers() {
+        if (interviewInterval) clearInterval(interviewInterval);
+        if (turnInterval) clearInterval(turnInterval);
+    }
+
     function connectWS() {
         const wsBase = toWS(ORCH_BASE);
         const sessionId = `sess-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
@@ -129,10 +170,12 @@ function initChat() {
             setThinking(true, 'Starting session...');
             const persona = (personaSelect && personaSelect.value) || sessionStorage.getItem('persona') || 'friendly_mentor';
             sessionStorage.setItem('persona', persona);
-            ws.send(JSON.stringify({
-                event: 'join_session',
-                payload: { job_description: context.job_description, candidate_resume: context.candidate_resume, persona }
-            }));
+            const payload = { job_description: context.job_description, candidate_resume: context.candidate_resume, persona };
+            const tl = parseInt(sessionStorage.getItem('time_limit'), 10);
+            const wl = parseInt(sessionStorage.getItem('word_limit'), 10);
+            if (!isNaN(tl)) payload.time_limit = tl;
+            if (!isNaN(wl)) payload.word_limit = wl;
+            ws.send(JSON.stringify({ event: 'join_session', payload }));
         };
 
         ws.onclose = () => {
@@ -156,6 +199,7 @@ function initChat() {
                 chatInput.disabled = false;
                 sendButton.disabled = false;
                 if (endButton) endButton.disabled = false;
+                startInterviewTimer();
             } else if (event === 'blueprint') {
                 blueprint = payload;
                 initStatsFromBlueprint(blueprint);
@@ -185,6 +229,7 @@ function initChat() {
                     updateStatsTable();
                 }
                 setThinking(false);
+                resetTurnTimer();
             } else if (event === 'interview_ended') {
                 setThinking(false);
                 addMessage('interviewer', 'Interview ended. Thank you for your time.');
@@ -193,6 +238,7 @@ function initChat() {
                 sendButton.disabled = true;
                 if (endButton) endButton.disabled = true;
                 if (statusText) statusText.textContent = 'Interview ended';
+                stopTimers();
             }
         };
     }
@@ -204,6 +250,10 @@ function initChat() {
         history.push({ role: 'candidate', message: messageText });
         addLog(`Candidate answered: ${messageText}`);
         chatInput.value = '';
+        const words = messageText.trim().split(/\s+/).filter(Boolean).length;
+        totalWords += words;
+        if (wordCounterEl) wordCounterEl.textContent = totalWords.toString();
+        if (turnInterval) clearInterval(turnInterval);
         setThinking(true);
         if (ws && ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ event: 'send_answer', payload: { answer_text: messageText } }));
@@ -221,6 +271,7 @@ function initChat() {
         if (ws && ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ event: 'end_interview' }));
         }
+        stopTimers();
     }
 
     sendButton.addEventListener('click', sendMessage);

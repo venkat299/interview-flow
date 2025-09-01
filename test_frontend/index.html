@@ -13,6 +13,13 @@
                 <option value="">-- Select sample data --</option>
             </select>
 
+            <select id="limit-select" class="form-select mb-3">
+                <option value="900" data-words="1500">15 minutes</option>
+                <option value="1200" data-words="2000">20 minutes</option>
+                <option value="1500" data-words="2500">25 minutes</option>
+                <option value="1800" data-words="3000">30 minutes</option>
+            </select>
+
             <textarea id="job-description" class="form-control mb-3" placeholder="Job description"></textarea>
             <textarea id="resume" class="form-control mb-3" placeholder="Paste your resume here"></textarea>
             <button id="start-button" class="btn btn-primary w-100">Start Interview</button>
@@ -62,8 +69,13 @@
     document.getElementById('start-button').addEventListener('click', () => {
         const jd = document.getElementById('job-description').value;
         const resume = document.getElementById('resume').value;
+        const limitSelect = document.getElementById('limit-select');
+        const timeLimit = parseInt(limitSelect.value, 10);
+        const wordLimit = parseInt(limitSelect.options[limitSelect.selectedIndex].dataset.words || '0', 10);
         sessionStorage.setItem('job_description', jd);
         sessionStorage.setItem('candidate_resume', resume);
+        sessionStorage.setItem('time_limit', timeLimit);
+        sessionStorage.setItem('word_limit', wordLimit);
         window.location.href = 'chat.html';
     });
     // bootstrap: load sample options on page load

@@ -19,15 +19,27 @@ def init_db(db_path: Path = DB_PATH) -> None:
             end_time TEXT,
             blueprint TEXT,
             rubric TEXT,
-            transcript TEXT
+            transcript TEXT,
+            time_limit INTEGER,
+            word_limit INTEGER,
+            final_duration INTEGER,
+            final_word_count INTEGER
         )
         """
     )
-    # Lightweight migration: ensure 'transcript' column exists
+    # Lightweight migration: ensure newer columns exist
     cur.execute("PRAGMA table_info(sessions)")
     cols = {row[1] for row in cur.fetchall()}
     if "transcript" not in cols:
         cur.execute("ALTER TABLE sessions ADD COLUMN transcript TEXT")
+    if "time_limit" not in cols:
+        cur.execute("ALTER TABLE sessions ADD COLUMN time_limit INTEGER")
+    if "word_limit" not in cols:
+        cur.execute("ALTER TABLE sessions ADD COLUMN word_limit INTEGER")
+    if "final_duration" not in cols:
+        cur.execute("ALTER TABLE sessions ADD COLUMN final_duration INTEGER")
+    if "final_word_count" not in cols:
+        cur.execute("ALTER TABLE sessions ADD COLUMN final_word_count INTEGER")
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS conversation_turns (
@@ -44,13 +56,25 @@ def init_db(db_path: Path = DB_PATH) -> None:
     conn.close()
 
 
-def create_session(session_id: str, blueprint: Dict, db_path: Path = DB_PATH) -> None:
+def create_session(
+    session_id: str,
+    blueprint: Dict,
+    time_limit: Optional[int] = None,
+    word_limit: Optional[int] = None,
+    db_path: Path = DB_PATH,
+) -> None:
     """Create a new session entry."""
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
     cur.execute(
-        "INSERT OR REPLACE INTO sessions (session_id, start_time, blueprint) VALUES (?, ?, ?)",
-        (session_id, datetime.utcnow().isoformat(), json.dumps(blueprint)),
+        "INSERT OR REPLACE INTO sessions (session_id, start_time, blueprint, time_limit, word_limit) VALUES (?, ?, ?, ?, ?)",
+        (
+            session_id,
+            datetime.utcnow().isoformat(),
+            json.dumps(blueprint),
+            time_limit,
+            word_limit,
+        ),
     )
     conn.commit()
     conn.close()
@@ -78,17 +102,21 @@ def end_session(
     session_id: str,
     rubric: Optional[Dict],
     transcript: Optional[List[Dict]] = None,
+    duration: Optional[int] = None,
+    word_count: Optional[int] = None,
     db_path: Path = DB_PATH,
 ) -> None:
     """Mark a session as ended and store the final rubric and transcript."""
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
     cur.execute(
-        "UPDATE sessions SET end_time = ?, rubric = ?, transcript = ? WHERE session_id = ?",
+        "UPDATE sessions SET end_time = ?, rubric = ?, transcript = ?, final_duration = ?, final_word_count = ? WHERE session_id = ?",
         (
             datetime.utcnow().isoformat(),
             json.dumps(rubric) if rubric is not None else None,
             json.dumps(transcript) if transcript is not None else None,
+            duration,
+            word_count,
             session_id,
         ),
     )
