@@ -8,6 +8,15 @@
 </head>
 <body>
     <div class="container my-4">
+        <div id="persona-box" class="mb-3">
+            <label for="persona-select" class="form-label">LLM Persona</label>
+            <select id="persona-select" class="form-select w-auto">
+                <option value="friendly_mentor">Friendly Mentor</option>
+                <option value="strict_examiner">Strict Examiner</option>
+                <option value="casual_peer">Casual Peer</option>
+            </select>
+        </div>
+
         <div class="card">
             <div id="chat-log" class="card-body overflow-auto" style="height: 400px;"></div>
             <div class="card-footer">
@@ -33,6 +42,18 @@
         <div id="log-box" class="card mt-3">
             <div class="card-header">Interview Log</div>
             <div id="log-body" class="card-body overflow-auto" style="height: 200px;"></div>
+        </div>
+
+        <div id="summary-box" class="card mt-3">
+            <div class="card-header">Topic Strengths</div>
+            <div id="summary-body" class="card-body">
+                <p class="text-muted mb-0">No topic evaluations yet.</p>
+            </div>
+        </div>
+
+        <div id="stats-box" class="card mt-3">
+            <div class="card-header">Question Stats</div>
+            <div id="stats-body" class="card-body"></div>
         </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>

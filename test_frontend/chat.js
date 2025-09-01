@@ -8,6 +8,9 @@ function initChat() {
     const statusSpinner = document.getElementById('status-spinner');
     const rubricBody = document.getElementById('rubric-body');
     const logBody = document.getElementById('log-body');
+    const summaryBody = document.getElementById('summary-body');
+    const statsBody = document.getElementById('stats-body');
+    const personaSelect = document.getElementById('persona-select');
 
     // HTTP base for the AI Orchestration Service
     const ORCH_BASE = sessionStorage.getItem('AI_SERVICE_URL') || 'http://localhost:8003';
@@ -25,6 +28,8 @@ function initChat() {
     let currentDifficulty = 3; // 1-5 scale
     let lastQuestion = '';
     let started = false;
+    const topicStrength = {}; // { topic: { total, count } }
+    const questionStats = {}; // { topic: {1:0,2:0,3:0,4:0,5:0} }
 
     function setThinking(thinking) {
         if (thinking) {
@@ -69,6 +74,39 @@ function initChat() {
         logBody.scrollTop = logBody.scrollHeight;
     }
 
+    function updateSummary() {
+        if (!summaryBody) return;
+        const parts = Object.entries(topicStrength).map(([topic, info]) => {
+            const avg = info.count ? info.total / info.count : 0;
+            const pct = Math.min(100, Math.max(0, avg * 10));
+            return `
+                <div class="mb-2">
+                    <div><strong>${topic}</strong> (${avg.toFixed(1)}/10)</div>
+                    <div class="progress">
+                        <div class="progress-bar" role="progressbar" style="width: ${pct}%;"></div>
+                    </div>
+                </div>
+            `;
+        });
+        summaryBody.innerHTML = parts.length ? parts.join('') : '<p class="text-muted mb-0">No topic evaluations yet.</p>';
+    }
+
+    function updateStatsTable() {
+        if (!statsBody) return;
+        const difficulties = [1,2,3,4,5];
+        const rows = Object.entries(questionStats).map(([topic, counts]) => {
+            const cells = difficulties.map(d => `<td>${counts[d] || 0}</td>`).join('');
+            return `<tr><td>${topic}</td>${cells}</tr>`;
+        }).join('');
+        const table = `
+            <table class="table table-sm mb-0">
+                <thead><tr><th>Topic</th>${difficulties.map(d => `<th>D${d}</th>`).join('')}</tr></thead>
+                <tbody>${rows || '<tr><td colspan="6" class="text-muted">No questions yet</td></tr>'}</tbody>
+            </table>
+        `;
+        statsBody.innerHTML = table;
+    }
+
     function depthToDifficulty(depth) {
         const s = String(depth || '').toLowerCase();
         if (s === 'fundamental' || s === 'beginner' || s === 'basic') return 1;
@@ -110,6 +148,14 @@ function initChat() {
         // Initialize difficulty from the first topic
         const t = currentTopic();
         currentDifficulty = t ? depthToDifficulty(t.required_depth) : 3;
+        if (blueprint && Array.isArray(blueprint.topics)) {
+            blueprint.topics.forEach((tp) => {
+                topicStrength[tp.name] = { total: 0, count: 0 };
+                questionStats[tp.name] = {1:0,2:0,3:0,4:0,5:0};
+            });
+            updateSummary();
+            updateStatsTable();
+        }
         if (endButton) endButton.disabled = false;
         started = true;
     }
@@ -130,6 +176,10 @@ function initChat() {
             history.push({ role: 'interviewer', message: q });
             addMessage('interviewer', q);
             addLog(`Asked question on ${t ? t.name : 'General'} (difficulty ${currentDifficulty})`);
+            if (t && questionStats[t.name]) {
+                questionStats[t.name][currentDifficulty] += 1;
+                updateStatsTable();
+            }
         }
     }
 
@@ -154,6 +204,11 @@ function initChat() {
             addLog(`Answer scored ${data.score}/10`);
             if (currentDifficulty !== prevDifficulty) {
                 addLog(`Difficulty changed from ${prevDifficulty} to ${currentDifficulty}`);
+            }
+            if (t && topicStrength[t.name]) {
+                topicStrength[t.name].total += data.score;
+                topicStrength[t.name].count += 1;
+                updateSummary();
             }
         }
         return data;
@@ -213,6 +268,17 @@ function initChat() {
     sendButton.addEventListener('click', sendMessage);
     chatInput.addEventListener('keypress', (e) => e.key === 'Enter' && sendMessage());
     if (endButton) endButton.addEventListener('click', endInterview);
+
+    if (personaSelect) {
+        const initialPersona = sessionStorage.getItem('persona') || 'friendly_mentor';
+        personaSelect.value = initialPersona;
+        sessionStorage.setItem('persona', initialPersona);
+        personaSelect.addEventListener('change', () => {
+            const p = personaSelect.value;
+            sessionStorage.setItem('persona', p);
+            addLog(`Persona switched to ${p}`);
+        });
+    }
 
     // Kick off
     if (statusSpinner) statusSpinner.classList.remove('d-none');
