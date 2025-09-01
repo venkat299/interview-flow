@@ -4,6 +4,10 @@ from statistics import mean
 
 from fpdf import FPDF
 
+# System font paths provided by fonts-dejavu-core (installed in Dockerfile)
+DEJAVU_SANS = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+DEJAVU_SANS_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+
 CONFIDENCE_MAP = {"Low": 1, "Medium": 2, "High": 3}
 
 
@@ -48,6 +52,11 @@ def _topic_stats(performance_log: List[Dict]) -> Dict[str, Dict[str, float]]:
     return results
 
 
+def _epw(pdf: FPDF) -> float:
+    """Effective page width (page width minus left/right margins)."""
+    return float(pdf.w) - float(pdf.l_margin) - float(pdf.r_margin)
+
+
 def generate_report_pdf(session: Dict, turns: List[Dict]) -> bytes:
     """Create a PDF report for a finished interview session."""
     blueprint = session.get("blueprint") or {}
@@ -59,11 +68,26 @@ def generate_report_pdf(session: Dict, turns: List[Dict]) -> bytes:
     resume_points = _unique([p for t in blueprint.get("topics", []) for p in t.get("resume_evidence", [])])
 
     pdf = FPDF()
+    # Consistent margins and auto page breaks
+    pdf.set_margins(15, 15, 15)
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
-    pdf.set_font("Helvetica", "B", 16)
+    # Register and use a Unicode-capable font to avoid encoding errors
+    try:
+        pdf.add_font("DejaVu", "", DEJAVU_SANS, uni=True)
+        pdf.add_font("DejaVu", "B", DEJAVU_SANS_BOLD, uni=True)
+        header_font = ("DejaVu", "B", 16)
+        body_font = ("DejaVu", "", 12)
+        small_font = ("DejaVu", "", 10)
+    except Exception:
+        # Fallback to core Helvetica if fonts are unavailable
+        header_font = ("Helvetica", "B", 16)
+        body_font = ("Helvetica", "", 12)
+        small_font = ("Helvetica", "", 10)
+
+    pdf.set_font(*header_font)
     pdf.cell(0, 10, "Interview Report", ln=1)
-    pdf.set_font("Helvetica", size=12)
+    pdf.set_font(*body_font)
     score = session.get("final_score")
     if score is not None:
         pdf.cell(0, 8, f"Overall Score: {score:.1f}", ln=1)
@@ -71,16 +95,19 @@ def generate_report_pdf(session: Dict, turns: List[Dict]) -> bytes:
         pdf.cell(0, 8, "Overall Score: N/A", ln=1)
     summary = session.get("summary")
     if summary:
-        pdf.multi_cell(0, 8, f"Summary: {summary}")
+        # Ensure we start at left margin and use a fixed usable width
+        pdf.set_x(pdf.l_margin)
+        pdf.multi_cell(_epw(pdf), 8, f"Summary: {summary}")
         pdf.ln(2)
 
-    pdf.set_font("Helvetica", "B", 14)
+    pdf.set_font(header_font[0], header_font[1], 14)
     pdf.cell(0, 10, "Topic Results", ln=1)
-    pdf.set_font("Helvetica", size=12)
+    pdf.set_font(*body_font)
     if topic_stats:
         for topic, data in topic_stats.items():
+            pdf.set_x(pdf.l_margin)
             pdf.multi_cell(
-                0,
+                _epw(pdf),
                 6,
                 f"{topic}: avg score {data['avg_score']:.1f}/10, "
                 f"avg confidence {data['avg_confidence']}, "
@@ -90,29 +117,31 @@ def generate_report_pdf(session: Dict, turns: List[Dict]) -> bytes:
         pdf.cell(0, 6, "No topic evaluations recorded.", ln=1)
     pdf.ln(2)
 
-    pdf.set_font("Helvetica", "B", 14)
+    pdf.set_font(header_font[0], header_font[1], 14)
     pdf.cell(0, 10, "Job Description Highlights", ln=1)
-    pdf.set_font("Helvetica", size=12)
+    pdf.set_font(*body_font)
     if job_points:
         for p in job_points:
-            pdf.multi_cell(0, 6, f"- {p}")
+            pdf.set_x(pdf.l_margin)
+            pdf.multi_cell(_epw(pdf), 6, f"- {p}")
     else:
         pdf.cell(0, 6, "No job description highlights available.", ln=1)
     pdf.ln(2)
 
-    pdf.set_font("Helvetica", "B", 14)
+    pdf.set_font(header_font[0], header_font[1], 14)
     pdf.cell(0, 10, "Resume Highlights", ln=1)
-    pdf.set_font("Helvetica", size=12)
+    pdf.set_font(*body_font)
     if resume_points:
         for p in resume_points:
-            pdf.multi_cell(0, 6, f"- {p}")
+            pdf.set_x(pdf.l_margin)
+            pdf.multi_cell(_epw(pdf), 6, f"- {p}")
     else:
         pdf.cell(0, 6, "No resume highlights available.", ln=1)
 
     pdf.add_page()
-    pdf.set_font("Helvetica", "B", 14)
+    pdf.set_font(header_font[0], header_font[1], 14)
     pdf.cell(0, 10, "Chat Transcript", ln=1)
-    pdf.set_font("Helvetica", size=10)
+    pdf.set_font(small_font[0], small_font[1], small_font[2])
     for turn in turns or []:
         role = turn.get("role", "")
         message = turn.get("message", "")
@@ -123,7 +152,8 @@ def generate_report_pdf(session: Dict, turns: List[Dict]) -> bytes:
                 f" [score {evaluation.get('score')}, "
                 f"conf {evaluation.get('llm_confidence')}]"
             )
-        pdf.multi_cell(0, 5, f"{role.title()}: {message}{eval_text}")
+        pdf.set_x(pdf.l_margin)
+        pdf.multi_cell(_epw(pdf), 5, f"{role.title()}: {message}{eval_text}")
         pdf.ln(1)
 
     return bytes(pdf.output(dest="S"))
