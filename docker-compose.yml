@@ -20,6 +20,8 @@ services:
     environment:
       # Use service name + container port for intra-network calls
       - AI_SERVICE_URL=http://ai_orchestration_service:8000
+      # Increase request timeout to tolerate slower LLM responses
+      - AI_TIMEOUT=60
     volumes:
       - ./services/interview_session_service:/code/interview_session_service
     command: uvicorn interview_session_service.app.main:app --host 0.0.0.0 --port 8000 --reload

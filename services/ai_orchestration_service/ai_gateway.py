@@ -137,6 +137,7 @@ class AIGateway:
             return raw
 
         # Attempt to parse a JSON object from the content
+        # Try to parse JSON content with some light cleaning
         parsed = self._parse_json_like(content)
         if isinstance(parsed, dict):
             # Task-specific normalization into our schemas
@@ -149,6 +150,24 @@ class AIGateway:
         # Best-effort fallback for simple question tasks
         if task_name == "question_generation":
             return {"question_text": content.strip()}
+
+        # Graceful fallbacks for structured tasks when providers emit non-JSON text
+        if task_name == "blueprint_generation":
+            # Attempt another parse after aggressive cleanup
+            salvage = self._parse_json_like(self._clean_text(content))
+            if isinstance(salvage, dict):
+                return self._normalize_blueprint(salvage)
+            # Minimal valid blueprint so the UI can proceed
+            return self._normalize_blueprint({})
+        if task_name == "answer_evaluation":
+            # Conservative default evaluation
+            return {
+                "score": 0.0,
+                "assessed_depth": "Intermediate",
+                "llm_confidence": "Low",
+                "justification": "Model returned non-JSON output.",
+                "is_truthful": True,
+            }
 
         # If we reached here, we couldn't produce the expected object
         raise ValueError(
@@ -165,7 +184,7 @@ class AIGateway:
         Tries direct JSON first, then fenced code blocks, then the first
         object-like substring between braces.
         """
-        text = text.strip()
+        text = AIGateway._clean_text(text.strip())
         # 1) direct parse
         try:
             return json.loads(text)
@@ -192,6 +211,19 @@ class AIGateway:
                 pass
 
         return None
+
+    @staticmethod
+    def _clean_text(text: str) -> str:
+        """Strip common provider wrappers and artifacts around JSON.
+
+        - Remove tokens like <|channel|>final, <|constrain|>JSON, <|message|>
+        - Trim leading/trailing code block markers and stray labels
+        """
+        # Remove <|...|> tokens that some providers emit
+        text = re.sub(r"<\|[^|>]+\|>", " ", text)
+        # Remove labels like 'final', 'JSON', 'message' at the start if present
+        text = re.sub(r"^(?:\s*(?:final|json|message|output|result)\s*[:\-]?\s*)+", "", text, flags=re.IGNORECASE)
+        return text.strip()
 
     @staticmethod
     def _normalize_blueprint(data: Dict[str, Any]) -> Dict[str, Any]:

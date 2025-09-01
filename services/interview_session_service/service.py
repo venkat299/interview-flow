@@ -19,22 +19,25 @@ class ConnectionManager:
         self.contexts: Dict[WebSocket, dict] = {}
         self.states: Dict[WebSocket, InterviewState] = {}
         self.session_ids: Dict[WebSocket, str] = {}
+        self.ended: Dict[WebSocket, bool] = {}
 
     async def connect(self, websocket: WebSocket, session_id: str) -> None:
         await websocket.accept()
         self.history[websocket] = []
         self.session_ids[websocket] = session_id
+        self.ended[websocket] = False
 
     def disconnect(self, websocket: WebSocket) -> None:
         session_id = self.session_ids.get(websocket)
         state = self.states.get(websocket)
-        if session_id:
+        if session_id and not self.ended.get(websocket):
             rubric = {"performance_log": state.performance_log} if state else None
             end_session(session_id, rubric)
         self.history.pop(websocket, None)
         self.contexts.pop(websocket, None)
         self.states.pop(websocket, None)
         self.session_ids.pop(websocket, None)
+        self.ended.pop(websocket, None)
 
     async def handle_message(self, websocket: WebSocket, data: dict) -> None:
         """Process an incoming message from the client."""
@@ -82,6 +85,17 @@ class ConnectionManager:
             await websocket.send_json(
                 {"event": "new_question", "payload": {"question_text": question}}
             )
+
+        elif event == "end_interview":
+            # Persist final rubric/state and close the connection
+            state = self.states.get(websocket)
+            rubric = {"performance_log": state.performance_log} if state else None
+            if session_id:
+                end_session(session_id, rubric)
+            self.ended[websocket] = True
+            await websocket.send_json({"event": "interview_ended"})
+            # Close the socket; disconnect handler will run and skip duplicate persist
+            await websocket.close()
 
     async def _next_question(self, websocket: WebSocket, history: List[dict]) -> str:
         context = self.contexts.get(websocket, {"job_description": ""})
