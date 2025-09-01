@@ -1,5 +1,6 @@
 """State management for an active interview session (embedded)."""
 from collections import deque
+import random
 from typing import Deque, Dict, List, Optional
 
 
@@ -29,6 +30,10 @@ class InterviewState:
         self.performance_log: List[Dict] = []
         self.current_phase: str = "introduction"
         self.needs_hint: bool = False
+        self.questions_asked: int = 0
+        self.switch_after: int = random.randint(2, 6)
+        self.switch_topic_now: bool = False
+        self.last_answer_quality: str = "neutral"
 
     def get_next_topic(self) -> Optional[Dict]:
         """Select the next topic ensuring lower difficulties are covered first."""
@@ -47,6 +52,9 @@ class InterviewState:
                 self.current_topic = topic
                 self.difficulty = self.difficulty_levels[self.topic_progress[name]]
                 self.needs_hint = False
+                self.questions_asked = 0
+                self.switch_after = random.randint(2, 6)
+                self.switch_topic_now = False
                 return topic
 
         self.current_topic = None
@@ -60,15 +68,26 @@ class InterviewState:
         if not topic_name:
             return
 
+        self.questions_asked += 1
         level = self.topic_progress.get(topic_name, 1)
         if score >= 7 and level < 5:
             level += 1
-            self.topic_progress[topic_name] = level
+        elif score < 5 and level > 1:
+            level -= 1
+        self.topic_progress[topic_name] = level
 
         # Determine if a hint should be provided on the next question
         self.needs_hint = score < 6 and level >= 4
 
         self.difficulty = self.difficulty_levels[level]
+        if score >= 7:
+            self.last_answer_quality = "correct"
+        elif score < 5:
+            self.last_answer_quality = "incorrect"
+        else:
+            self.last_answer_quality = "neutral"
+
+        self.switch_topic_now = self.questions_asked >= self.switch_after
 
     def advance_phase(self) -> None:
         """Move to the next phase in the interview flow."""
@@ -79,6 +98,5 @@ class InterviewState:
 
     def should_switch_topic(self) -> bool:
         """Decide whether to switch to the next topic."""
-        # Placeholder logic: never switch automatically
-        return False
+        return self.switch_topic_now
 

@@ -58,3 +58,32 @@ async def test_next_question_has_feedback(monkeypatch):
 
     question = await mgr._next_question(websocket, [])
     assert question.startswith("Great, let's move on.")
+
+
+@pytest.mark.asyncio
+async def test_lower_difficulty_after_poor_answer():
+    blueprint = {"topics": [{"name": "python", "relevance_to_role": 10}]}
+    state = InterviewState(blueprint)
+    state.get_next_topic()
+    state.switch_after = 99
+    state.update_state_after_answer({"score": 8})
+    assert state.topic_progress["python"] == 2
+    state.update_state_after_answer({"score": 2})
+    assert state.topic_progress["python"] == 1
+
+
+@pytest.mark.asyncio
+async def test_switch_topic_after_threshold():
+    blueprint = {"topics": [
+        {"name": "python", "relevance_to_role": 10},
+        {"name": "databases", "relevance_to_role": 8},
+    ]}
+    state = InterviewState(blueprint)
+    state.get_next_topic()
+    state.switch_after = 2
+    state.update_state_after_answer({"score": 8})
+    assert not state.should_switch_topic()
+    state.update_state_after_answer({"score": 8})
+    assert state.should_switch_topic()
+    state.get_next_topic()
+    assert state.current_topic["name"] == "databases"

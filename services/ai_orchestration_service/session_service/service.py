@@ -133,6 +133,8 @@ class ConnectionManager:
             if state and state.current_phase == "technical":
                 evaluation_result = await self._evaluate_answer(state, conversation, websocket, answer)
                 state.update_state_after_answer(evaluation_result)
+                if state.should_switch_topic():
+                    state.get_next_topic()
             else:
                 evaluation_result = {}
             if session_id:
@@ -214,12 +216,24 @@ class ConnectionManager:
             persona=self.persona.get(websocket) or "friendly_mentor",
             needs_hint=getattr(state, "needs_hint", False),
         )
-        feedback_options = [
-            "Great, let's move on.",
-            "Thanks for sharing. Now, let's consider this...",
-            "Good insight. Here's another one:",
-        ]
-        feedback = random.choice(feedback_options)
+        quality = getattr(state, "last_answer_quality", "neutral") if state else "neutral"
+        if quality == "correct":
+            options = [
+                "Great job!", "Nice work. Let's keep going.", "Excellent answer. Here's the next one:",
+            ]
+        elif quality == "incorrect":
+            options = [
+                "Thanks for trying. Let's take a step back.",
+                "No worries, we can look at an easier one.",
+                "Good effort. Let's tackle this from another angle:",
+            ]
+        else:
+            options = [
+                "Thanks for sharing. Now, let's consider this...",
+                "Good insight. Here's another one:",
+                "Alright, let's move on.",
+            ]
+        feedback = random.choice(options)
         question = await generate_next_question(req)
         return f"{feedback} {question}"
 
