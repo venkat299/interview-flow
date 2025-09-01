@@ -1,5 +1,7 @@
 """Core AI interview utilities."""
 
+from typing import List
+
 from .schemas import (
     InterviewRequest,
     InterviewContext,
@@ -164,3 +166,21 @@ async def evaluate_candidate_answer(
     )
 
     return EvaluationResponse.model_validate(data)
+
+
+async def generate_final_summary(performance_log: List[dict]) -> dict:
+    """Generate a holistic final score and summary from a performance log."""
+
+    system_prompt = (
+        "You are an AI hiring manager. Based on the following performance log from a technical interview, "
+        "provide a holistic final score from 0 to 10 and a brief summary of the candidate's strengths and weaknesses. "
+        f"The performance log contains a series of evaluations for each answer given by the candidate. Performance Log: {performance_log}. "
+        "Respond ONLY with a single, valid JSON object with 'final_score' and 'summary' keys."
+    )
+
+    data = await gateway.execute_task(
+        task_name="final_summary",
+        system_prompt=system_prompt,
+    )
+
+    return data

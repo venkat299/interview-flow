@@ -19,6 +19,7 @@ from ai_orchestration_service.ai_orchestration import (
     evaluate_candidate_answer,
     generate_introductory_question,
     generate_soft_skill_question,
+    generate_final_summary,
 )
 from .interview_state import InterviewState
 from .database import create_session, log_turn, end_session
@@ -163,14 +164,45 @@ class ConnectionManager:
                 }
             )
 
+        elif event == "skip_question":
+            conversation.append({"role": "candidate", "message": "[skipped]"})
+            if session_id:
+                log_turn(session_id, "candidate", "[skipped]", {"skipped": True})
+            state = self.states.get(websocket)
+            if state:
+                state.advance_phase()
+            question = await self._next_question(websocket, conversation)
+            conversation.append({"role": "interviewer", "message": question})
+            self.last_question[websocket] = question
+            if session_id:
+                log_turn(session_id, "interviewer", question)
+            topic_name = (self.states.get(websocket).current_topic or {}).get("name") if self.states.get(websocket) else None
+            diff_num = self._depth_to_difficulty(self.states.get(websocket).difficulty) if self.states.get(websocket) else 3
+            await websocket.send_json(
+                {
+                    "event": "new_question",
+                    "payload": {
+                        "question_text": question,
+                        "topic": topic_name,
+                        "difficulty": diff_num,
+                    },
+                }
+            )
+
         elif event == "end_interview":
             state = self.states.get(websocket)
             rubric = {"performance_log": state.performance_log} if state else None
+            final_score = None
+            summary = None
+            if state:
+                result = await generate_final_summary(state.performance_log)
+                final_score = result.get("final_score") if isinstance(result, dict) else None
+                summary = result.get("summary") if isinstance(result, dict) else None
             if session_id:
                 transcript = list(self.history.get(websocket) or [])
                 duration = int(time.time() - self.start_time.get(websocket, time.time()))
                 words = self.word_count.get(websocket, 0)
-                end_session(session_id, rubric, transcript, duration, words)
+                end_session(session_id, rubric, transcript, duration, words, final_score, summary)
             self.ended[websocket] = True
             await websocket.send_json({"event": "interview_ended"})
             await websocket.close()

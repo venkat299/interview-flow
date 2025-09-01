@@ -23,7 +23,9 @@ def init_db(db_path: Path = DB_PATH) -> None:
             time_limit INTEGER,
             word_limit INTEGER,
             final_duration INTEGER,
-            final_word_count INTEGER
+            final_word_count INTEGER,
+            final_score REAL,
+            summary TEXT
         )
         """
     )
@@ -40,6 +42,10 @@ def init_db(db_path: Path = DB_PATH) -> None:
         cur.execute("ALTER TABLE sessions ADD COLUMN final_duration INTEGER")
     if "final_word_count" not in cols:
         cur.execute("ALTER TABLE sessions ADD COLUMN final_word_count INTEGER")
+    if "final_score" not in cols:
+        cur.execute("ALTER TABLE sessions ADD COLUMN final_score REAL")
+    if "summary" not in cols:
+        cur.execute("ALTER TABLE sessions ADD COLUMN summary TEXT")
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS conversation_turns (
@@ -104,19 +110,23 @@ def end_session(
     transcript: Optional[List[Dict]] = None,
     duration: Optional[int] = None,
     word_count: Optional[int] = None,
+    final_score: Optional[float] = None,
+    summary: Optional[str] = None,
     db_path: Path = DB_PATH,
 ) -> None:
-    """Mark a session as ended and store the final rubric and transcript."""
+    """Mark a session as ended and store the final rubric, transcript, and summary."""
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
     cur.execute(
-        "UPDATE sessions SET end_time = ?, rubric = ?, transcript = ?, final_duration = ?, final_word_count = ? WHERE session_id = ?",
+        "UPDATE sessions SET end_time = ?, rubric = ?, transcript = ?, final_duration = ?, final_word_count = ?, final_score = ?, summary = ? WHERE session_id = ?",
         (
             datetime.utcnow().isoformat(),
             json.dumps(rubric) if rubric is not None else None,
             json.dumps(transcript) if transcript is not None else None,
             duration,
             word_count,
+            final_score,
+            summary,
             session_id,
         ),
     )
@@ -148,14 +158,14 @@ def get_session(session_id: str, db_path: Path = DB_PATH) -> Optional[Dict[str, 
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
     cur.execute(
-        "SELECT session_id, start_time, end_time, blueprint, rubric, transcript FROM sessions WHERE session_id = ?",
+        "SELECT session_id, start_time, end_time, blueprint, rubric, transcript, final_score, summary FROM sessions WHERE session_id = ?",
         (session_id,),
     )
     row = cur.fetchone()
     conn.close()
     if not row:
         return None
-    sid, start, end, blueprint, rubric, transcript = row
+    sid, start, end, blueprint, rubric, transcript, final_score, summary = row
     def _loads(val: Optional[str]) -> Any:
         if val is None:
             return None
@@ -170,6 +180,8 @@ def get_session(session_id: str, db_path: Path = DB_PATH) -> Optional[Dict[str, 
         "blueprint": _loads(blueprint),
         "rubric": _loads(rubric),
         "transcript": _loads(transcript),
+        "final_score": final_score,
+        "summary": summary,
     }
 
 

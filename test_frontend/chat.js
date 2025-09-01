@@ -2,6 +2,7 @@ function initChat() {
     const chatLog = document.getElementById('chat-log');
     const chatInput = document.getElementById('chat-input');
     const sendButton = document.getElementById('send-button');
+    const skipButton = document.getElementById('skip-button');
     const endButton = document.getElementById('end-button');
     const statusText = document.getElementById('status-text');
     const statusSpinner = document.getElementById('status-spinner');
@@ -48,11 +49,13 @@ function initChat() {
             if (statusText) statusText.textContent = text || 'AI is thinking...';
             chatInput.disabled = true;
             sendButton.disabled = true;
+            if (skipButton) skipButton.disabled = true;
         } else {
             if (statusSpinner) statusSpinner.classList.add('d-none');
             if (statusText) statusText.textContent = 'Connected';
             chatInput.disabled = false;
             sendButton.disabled = false;
+            if (skipButton) skipButton.disabled = false;
             chatInput.focus();
         }
     }
@@ -198,6 +201,7 @@ function initChat() {
                 if (statusText) statusText.textContent = 'Connected';
                 chatInput.disabled = false;
                 sendButton.disabled = false;
+                if (skipButton) skipButton.disabled = false;
                 if (endButton) endButton.disabled = false;
                 startInterviewTimer();
             } else if (event === 'blueprint') {
@@ -236,6 +240,7 @@ function initChat() {
                 addLog('Interview ended');
                 chatInput.disabled = true;
                 sendButton.disabled = true;
+                if (skipButton) skipButton.disabled = true;
                 if (endButton) endButton.disabled = true;
                 if (statusText) statusText.textContent = 'Interview ended';
                 stopTimers();
@@ -266,6 +271,7 @@ function initChat() {
         setThinking(false);
         chatInput.disabled = true;
         sendButton.disabled = true;
+        if (skipButton) skipButton.disabled = true;
         if (endButton) endButton.disabled = true;
         if (statusText) statusText.textContent = 'Ending interview...';
         if (ws && ws.readyState === WebSocket.OPEN) {
@@ -274,8 +280,17 @@ function initChat() {
         stopTimers();
     }
 
+    function skipQuestion() {
+        addLog('Candidate skipped the question');
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ event: 'skip_question' }));
+        }
+        setThinking(true);
+    }
+
     sendButton.addEventListener('click', sendMessage);
     chatInput.addEventListener('keypress', (e) => e.key === 'Enter' && sendMessage());
+    if (skipButton) skipButton.addEventListener('click', skipQuestion);
     if (endButton) endButton.addEventListener('click', endInterview);
 
     if (personaSelect) {
