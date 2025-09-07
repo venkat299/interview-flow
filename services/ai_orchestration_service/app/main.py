@@ -4,6 +4,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from ai_orchestration_service.ai_orchestration import (
     generate_next_question,
     create_interview_blueprint,
+    on_question_selected,
+    on_answer_scored,
     evaluate_candidate_answer,
 )
 from ai_orchestration_service.schemas import (
@@ -40,6 +42,15 @@ async def create_blueprint_endpoint(
     """Create a detailed interview blueprint."""
     return await create_interview_blueprint(context)
 
+
+@app.post("/on-question-selected")
+async def on_question_selected_endpoint(payload: dict):
+    return await on_question_selected(payload.get("question", ""), payload.get("state"))
+
+
+@app.post("/on-answer-scored")
+async def on_answer_scored_endpoint(payload: dict):
+    return await on_answer_scored(payload.get("question", ""), payload.get("answer", ""), payload.get("state"))
 
 @app.post("/evaluate-answer", response_model=EvaluationResponse)
 async def evaluate_answer(request: EvaluationRequest) -> EvaluationResponse:
