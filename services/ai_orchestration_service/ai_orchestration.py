@@ -11,6 +11,10 @@ from .schemas import (
 )
 from .ai_gateway import gateway
 from .personas import PERSONA_PROMPTS
+from interviewer_service import LLMInterviewer
+from monitor_service import LLMMonitor
+from scoring_service import ScoringEngine
+
 
 
 async def generate_introductory_question() -> str:
@@ -184,3 +188,48 @@ async def generate_final_summary(performance_log: List[dict]) -> dict:
     )
 
     return data
+
+
+_interviewer = LLMInterviewer()
+_monitor = LLMMonitor()
+_scoring = ScoringEngine()
+
+
+async def on_question_selected(question: str, state: dict | None = None) -> dict:
+    """Hook invoked after the orchestrator selects a question.
+
+    Parameters
+    ----------
+    question: str
+        Raw question text selected by the orchestrator.
+    state: dict | None
+        Optional interview state for context.
+    Returns
+    -------
+    dict
+        Paraphrased question and monitor diagnostics.
+    """
+    paraphrased = await _interviewer.next_question(state or {}, {"stem": question})
+    diag = await _monitor.assess_turn(state or {}, question, "")
+    return {"question_text": paraphrased, "monitor": diag}
+
+
+async def on_answer_scored(question: str, answer: str, state: dict | None = None) -> dict:
+    """Hook invoked after an answer is evaluated.
+
+    Parameters
+    ----------
+    question: str
+        The question that was asked.
+    answer: str
+        Candidate's response.
+    state: dict | None
+        Interview state for reference.
+    Returns
+    -------
+    dict
+        Aggregated scoring payload.
+    """
+    diag = await _monitor.assess_turn(state or {}, question, answer)
+    score = _scoring.aggregate(diag, [], {})
+    return {"monitor": diag, "score": score}
