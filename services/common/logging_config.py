@@ -68,6 +68,9 @@ def setup_logging(level: Optional[str] = None, *, force: bool = True) -> int:
     # Reduce noise from third-party libraries at TRACE/DEBUG
     for noisy in ("httpx", "uvicorn", "uvicorn.error", "uvicorn.access", "asyncio"):
         logging.getLogger(noisy).setLevel(max(logging.INFO, lvl))
+    # Explicitly suppress chatty libraries regardless of global level
+    for quiet in ("fontTools", "fontTools.subset", "fpdf"):
+        logging.getLogger(quiet).setLevel(logging.ERROR)
     return lvl
 
 
