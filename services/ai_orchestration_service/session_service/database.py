@@ -25,7 +25,8 @@ def init_db(db_path: Path = DB_PATH) -> None:
             final_duration INTEGER,
             final_word_count INTEGER,
             final_score REAL,
-            summary TEXT
+            summary TEXT,
+            ended_by TEXT
         )
         """
     )
@@ -46,6 +47,8 @@ def init_db(db_path: Path = DB_PATH) -> None:
         cur.execute("ALTER TABLE sessions ADD COLUMN final_score REAL")
     if "summary" not in cols:
         cur.execute("ALTER TABLE sessions ADD COLUMN summary TEXT")
+    if "ended_by" not in cols:
+        cur.execute("ALTER TABLE sessions ADD COLUMN ended_by TEXT")
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS conversation_turns (
@@ -112,13 +115,14 @@ def end_session(
     word_count: Optional[int] = None,
     final_score: Optional[float] = None,
     summary: Optional[str] = None,
+    ended_by: Optional[str] = None,
     db_path: Path = DB_PATH,
 ) -> None:
     """Mark a session as ended and store the final rubric, transcript, and summary."""
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
     cur.execute(
-        "UPDATE sessions SET end_time = ?, rubric = ?, transcript = ?, final_duration = ?, final_word_count = ?, final_score = ?, summary = ? WHERE session_id = ?",
+        "UPDATE sessions SET end_time = ?, rubric = ?, transcript = ?, final_duration = ?, final_word_count = ?, final_score = ?, summary = ?, ended_by = ? WHERE session_id = ?",
         (
             datetime.utcnow().isoformat(),
             json.dumps(rubric) if rubric is not None else None,
@@ -127,6 +131,7 @@ def end_session(
             word_count,
             final_score,
             summary,
+            ended_by,
             session_id,
         ),
     )
@@ -158,14 +163,14 @@ def get_session(session_id: str, db_path: Path = DB_PATH) -> Optional[Dict[str, 
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
     cur.execute(
-        "SELECT session_id, start_time, end_time, blueprint, rubric, transcript, final_score, summary FROM sessions WHERE session_id = ?",
+        "SELECT session_id, start_time, end_time, blueprint, rubric, transcript, final_score, summary, ended_by FROM sessions WHERE session_id = ?",
         (session_id,),
     )
     row = cur.fetchone()
     conn.close()
     if not row:
         return None
-    sid, start, end, blueprint, rubric, transcript, final_score, summary = row
+    sid, start, end, blueprint, rubric, transcript, final_score, summary, ended_by = row
     def _loads(val: Optional[str]) -> Any:
         if val is None:
             return None
@@ -182,6 +187,7 @@ def get_session(session_id: str, db_path: Path = DB_PATH) -> Optional[Dict[str, 
         "transcript": _loads(transcript),
         "final_score": final_score,
         "summary": summary,
+        "ended_by": ended_by,
     }
 
 
@@ -203,4 +209,3 @@ def get_conversation_turns(session_id: str, db_path: Path = DB_PATH) -> List[Dic
             ev = None
         result.append({"id": _id, "role": role, "message": message, "evaluation": ev})
     return result
-

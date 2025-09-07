@@ -55,7 +55,7 @@ class ConnectionManager:
             transcript = self.history.get(websocket) or []
             duration = int(time.time() - self.start_time.get(websocket, time.time()))
             words = self.word_count.get(websocket, 0)
-            end_session(session_id, rubric, transcript, duration, words)
+            end_session(session_id, rubric, transcript, duration, words, ended_by="system")
         self.history.pop(websocket, None)
         self.contexts.pop(websocket, None)
         self.states.pop(websocket, None)
@@ -202,7 +202,7 @@ class ConnectionManager:
                 transcript = list(self.history.get(websocket) or [])
                 duration = int(time.time() - self.start_time.get(websocket, time.time()))
                 words = self.word_count.get(websocket, 0)
-                end_session(session_id, rubric, transcript, duration, words, final_score, summary)
+                end_session(session_id, rubric, transcript, duration, words, final_score, summary, ended_by="user")
             self.ended[websocket] = True
             await websocket.send_json({"event": "interview_ended"})
             await websocket.close()
@@ -225,7 +225,7 @@ class ConnectionManager:
             transcript = list(self.history.get(websocket) or [])
             duration = int(time.time() - self.start_time.get(websocket, time.time()))
             words = self.word_count.get(websocket, 0)
-            end_session(session_id, rubric, transcript, duration, words)
+            end_session(session_id, rubric, transcript, duration, words, ended_by="system")
         self.ended[websocket] = True
         await websocket.send_json({"event": "interview_ended"})
         await websocket.close()
