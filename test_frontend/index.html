@@ -21,7 +21,7 @@
             <div class="mb-3">
                 <textarea id="resume" class="form-control" placeholder="Paste your resume here"></textarea>
             </div>
-            <button id="start-button" class="btn btn-primary w-100">Start Interview</button>
+            <button id="start-button" class="btn btn-primary w-100" disabled>Start Interview</button>
         </div>
 
         <div class="card p-4 mx-auto mt-4" style="max-width: 900px;">
@@ -69,9 +69,20 @@
         testingMode = testToggle.checked;
     });
 
+    const jobDescEl = document.getElementById('job-description');
+    const resumeEl = document.getElementById('resume');
+    const startBtn = document.getElementById('start-button');
+
+    function updateStartButtonState() {
+        const hasJD = !!(jobDescEl.value && jobDescEl.value.trim());
+        const hasResume = !!(resumeEl.value && resumeEl.value.trim());
+        startBtn.disabled = !(hasJD && hasResume);
+    }
+
     async function applyJobSelection(id) {
-        document.getElementById('job-description').value = '';
-        document.getElementById('resume').value = '';
+        jobDescEl.value = '';
+        resumeEl.value = '';
+        updateStartButtonState();
         if (!id) return;
         try {
             const resp = await fetch(`${AI_SERVICE_URL}/job-postings/${id}`);
@@ -86,13 +97,14 @@
                 const bullets = item.required_qualifications.map(q => `- ${q}`).join('\n');
                 parts.push(`Required Qualifications:\n${bullets}`);
             }
-            document.getElementById('job-description').value = parts.join('\n\n');
+            jobDescEl.value = parts.join('\n\n');
             if (testingMode) {
                 const gen = await fetch(`${AI_SERVICE_URL}/app-test/generate-candidate/${id}`, { method: 'POST' });
                 const cand = await gen.json();
                 if (cand.candidate_id) sessionStorage.setItem('candidate_id', cand.candidate_id);
-                document.getElementById('resume').value = cand.resume || '';
+                resumeEl.value = cand.resume || '';
             }
+            updateStartButtonState();
         } catch (e) {
             console.error('Failed to load job', e);
         }
@@ -137,9 +149,13 @@
     }
 
 
+    // Keep button state in sync with user typing
+    jobDescEl.addEventListener('input', updateStartButtonState);
+    resumeEl.addEventListener('input', updateStartButtonState);
+
     document.getElementById('start-button').addEventListener('click', () => {
-        const jd = document.getElementById('job-description').value;
-        const resume = document.getElementById('resume').value;
+        const jd = jobDescEl.value;
+        const resume = resumeEl.value;
         // Defaults after removing time/word dropdowns
         const timeLimit = 900; // 15 minutes
         const wordLimit = 1500; // ~1500 words
@@ -177,7 +193,13 @@
         await loadJobPostings();
     });
 
-    // bootstrap: load job postings and sessions on page load
+    // bootstrap: clear inputs, enable Testing Mode, then load data
+    jobDescEl.value = '';
+    resumeEl.value = '';
+    updateStartButtonState();
+    // Turn on testing mode by default
+    try { testToggle.checked = true; } catch (_) {}
+    testingMode = true;
     loadJobPostings();
     loadSessions();
     </script>
