@@ -1,25 +1,22 @@
 """WebSocket session manager wired to AI orchestration functions."""
+import random
 from typing import Dict, List, Optional
 
-import random
-import time
 
 from fastapi import WebSocket
 
+from orchestrator_service import Orchestrator
+
 from ai_orchestration_service.schemas import (
     InterviewContext,
-    ConversationTurn,
-    InterviewRequest,
     EvaluationRequest,
     TopicBlueprint,
 )
 from ai_orchestration_service.ai_orchestration import (
-    generate_next_question,
     create_interview_blueprint,
     evaluate_candidate_answer,
-    generate_introductory_question,
-    generate_soft_skill_question,
     generate_final_summary,
+    generate_next_question,
 )
 from .interview_state import InterviewState
 from .database import create_session, log_turn, end_session
@@ -40,6 +37,7 @@ class ConnectionManager:
         self.time_limit: Dict[WebSocket, Optional[int]] = {}
         self.word_limit: Dict[WebSocket, Optional[int]] = {}
         self.word_count: Dict[WebSocket, int] = {}
+        self.orchestrator = Orchestrator()
 
     async def connect(self, websocket: WebSocket, session_id: str) -> None:
         await websocket.accept()
@@ -111,6 +109,7 @@ class ConnectionManager:
             self.last_question[websocket] = question
             if session_id:
                 log_turn(session_id, "interviewer", question)
+            await self.orchestrator.record_turn({"role": "interviewer", "message": question})
             # Include topic and difficulty metadata for clients
             topic_name = (self.states.get(websocket).current_topic or {}).get("name") if self.states.get(websocket) else None
             diff_num = self._depth_to_difficulty(self.states.get(websocket).difficulty) if self.states.get(websocket) else 3
@@ -129,6 +128,7 @@ class ConnectionManager:
             answer = data.get("payload", {}).get("answer_text", "")
             conversation.append({"role": "candidate", "message": answer})
             self.word_count[websocket] = self.word_count.get(websocket, 0) + len(answer.split())
+            await self.orchestrator.record_turn({"role": "candidate", "message": answer})
             await websocket.send_json({"event": "interviewer_typing"})
             state = self.states.get(websocket)
             if state and state.current_phase == "technical":
@@ -141,6 +141,7 @@ class ConnectionManager:
             if session_id:
                 log_turn(session_id, "candidate", answer, evaluation_result or None)
             await websocket.send_json({"event": "evaluation", "payload": evaluation_result})
+            await self.on_turn_complete(evaluation_result)
             if self._limits_exceeded(websocket):
                 await self._force_end(websocket)
                 return
@@ -151,6 +152,7 @@ class ConnectionManager:
             self.last_question[websocket] = question
             if session_id:
                 log_turn(session_id, "interviewer", question)
+            await self.orchestrator.record_turn({"role": "interviewer", "message": question})
             topic_name = (self.states.get(websocket).current_topic or {}).get("name") if self.states.get(websocket) else None
             diff_num = self._depth_to_difficulty(self.states.get(websocket).difficulty) if self.states.get(websocket) else 3
             await websocket.send_json(
@@ -166,6 +168,7 @@ class ConnectionManager:
 
         elif event == "skip_question":
             conversation.append({"role": "candidate", "message": "[skipped]"})
+            await self.orchestrator.record_turn({"role": "candidate", "message": "[skipped]"})
             if session_id:
                 log_turn(session_id, "candidate", "[skipped]", {"skipped": True})
             state = self.states.get(websocket)
@@ -176,6 +179,7 @@ class ConnectionManager:
             self.last_question[websocket] = question
             if session_id:
                 log_turn(session_id, "interviewer", question)
+            await self.orchestrator.record_turn({"role": "interviewer", "message": question})
             topic_name = (self.states.get(websocket).current_topic or {}).get("name") if self.states.get(websocket) else None
             diff_num = self._depth_to_difficulty(self.states.get(websocket).difficulty) if self.states.get(websocket) else 3
             await websocket.send_json(
@@ -233,41 +237,15 @@ class ConnectionManager:
     async def _next_question(self, websocket: WebSocket, history: List[dict]) -> str:
         context_dict = self.contexts.get(websocket, {"job_description": ""})
         state = self.states.get(websocket)
-        if state and state.current_phase == "introduction":
-            return await generate_introductory_question()
-        if state and state.current_phase == "soft_skills":
-            resume = context_dict.get("candidate_resume", "")
-            return await generate_soft_skill_question(resume)
-        topic_name = (state.current_topic or {}).get("name") if state else None
-        difficulty_num = self._depth_to_difficulty(state.difficulty) if state else 3
-        req = InterviewRequest(
-            context=InterviewContext(**context_dict),
-            history=[ConversationTurn(**t) for t in history],
-            current_topic=topic_name or "General",
-            current_difficulty=difficulty_num,
-            persona=self.persona.get(websocket) or "friendly_mentor",
-            needs_hint=getattr(state, "needs_hint", False),
+        persona = self.persona.get(websocket) or "friendly_mentor"
+        return await self.orchestrator.loop(
+            state,
+            context_dict,
+            history,
+            persona,
+            generate_next_question,
         )
-        quality = getattr(state, "last_answer_quality", "neutral") if state else "neutral"
-        if quality == "correct":
-            options = [
-                "Great job!", "Nice work. Let's keep going.", "Excellent answer. Here's the next one:",
-            ]
-        elif quality == "incorrect":
-            options = [
-                "Thanks for trying. Let's take a step back.",
-                "No worries, we can look at an easier one.",
-                "Good effort. Let's tackle this from another angle:",
-            ]
-        else:
-            options = [
-                "Thanks for sharing. Now, let's consider this...",
-                "Good insight. Here's another one:",
-                "Alright, let's move on.",
-            ]
-        feedback = random.choice(options)
-        question = await generate_next_question(req)
-        return f"{feedback} {question}"
+
 
     async def _evaluate_answer(
         self,
@@ -290,6 +268,11 @@ class ConnectionManager:
         data["topic"] = topic_dict.get("name") if isinstance(topic_dict, dict) else None
         data["difficulty"] = self._depth_to_difficulty(state.difficulty)
         return data
+
+    async def on_turn_complete(self, result: dict) -> None:
+        """Hook for monitor and scoring modules to observe turn results."""
+        _ = result  # placeholder to satisfy type checkers
+        return None
 
     @staticmethod
     def _depth_to_difficulty(depth: str) -> int:
