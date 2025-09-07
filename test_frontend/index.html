@@ -141,7 +141,17 @@
         try {
             const resp = await fetch(`${AI_SERVICE_URL}/job-postings/${id}`);
             const item = await resp.json();
-            document.getElementById('job-description').value = item.description || '';
+            const parts = [];
+            if (item.description) parts.push(String(item.description).trim());
+            if (Array.isArray(item.responsibilities) && item.responsibilities.length) {
+                const bullets = item.responsibilities.map(r => `- ${r}`).join('\n');
+                parts.push(`Responsibilities:\n${bullets}`);
+            }
+            if (Array.isArray(item.required_qualifications) && item.required_qualifications.length) {
+                const bullets = item.required_qualifications.map(q => `- ${q}`).join('\n');
+                parts.push(`Required Qualifications:\n${bullets}`);
+            }
+            document.getElementById('job-description').value = parts.join('\n\n');
             if (testingMode) {
                 const gen = await fetch(`${AI_SERVICE_URL}/app-test/generate-candidate/${id}`, { method: 'POST' });
                 const cand = await gen.json();
