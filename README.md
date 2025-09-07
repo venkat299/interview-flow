@@ -9,10 +9,17 @@ The goal of this project is to develop an AI-powered technical screening platfor
 The platform is built on a modern, scalable backend using a **microservices architecture**.
 
 * **Language & Framework**: The entire backend is built with **Python** and **FastAPI**, chosen for its high performance and asynchronous capabilities.
-* **AI Engine**: The core intelligence is provided by an **`AI Orchestration Service`** that uses a large language model (LLM) to generate questions on the fly. It engineers prompts based on the job description and conversation history to ensure questions are relevant and insightful.
-* **Real-Time Interaction**: The **AI Orchestration Service** also manages the candidate experience. It exposes **WebSocket** endpoints to run live interviews and persists transcripts in SQLite.
-* **Persistence**: When an interview ends, the service persists the full conversation transcript (as JSON) together with the session metadata and final rubric in a local SQLite DB (`services/ai_orchestration_service/session_service/interview_sessions.db`).
-* **Development & Deployment**: The services are containerized using **Docker** and orchestrated for local development with **Docker Compose**, ensuring a consistent and reproducible environment.
+* **Orchestrator**: A central decision layer that owns pacing, logging and agenda coverage. It pulls in helper services to pick questions, score answers and store results.
+* **Helper Services**: Modular packages in `services/` provide distinct responsibilities:
+  * `interviewer_service` – phrasing questions and follow-ups.
+  * `monitor_service` – shadow evaluation, guardrails and timing nudges.
+  * `scoring_service` – aggregates test results and rubric ratings into final scores.
+  * `question_service` – seed bank management and on-the-fly generation.
+  * `sandbox_service` – code and SQL execution sandboxes.
+  * `verification_service` – resume-claim probing utilities.
+  * `analytics_service`, `guardrails_service`, `adaptivity_service`, and `evidence_service` supply metrics, safety filters, ability models and resume parsing.
+* **Real-Time Interaction**: The orchestration service exposes **WebSocket** endpoints to run live interviews and persists transcripts in SQLite via `storage_service`.
+* **Development & Deployment**: All services are bundled into a single container using **Docker**. The image copies the entire repository and sets `PYTHONPATH=/code/services` so each module can be imported. Local development is driven with **Docker Compose**, ensuring a consistent and reproducible environment.
 
 ## 3. Local Development
 
@@ -21,10 +28,10 @@ Run the service with Docker Compose:
 1. Copy the example environment file and provide your own credentials:
 
    ```bash
-   cp services/ai_orchestration_service/.env.example services/ai_orchestration_service/.env
+   cp services/gateway_service/.env.example services/gateway_service/.env
    ```
 
-   Update `services/ai_orchestration_service/.env` with real values for `LLM_PROVIDER`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `GEMINI_API_KEY`, and `LOCAL_LLM_URL`.
+   Update `services/gateway_service/.env` with real values for `LLM_PROVIDER`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `GEMINI_API_KEY`, and `LOCAL_LLM_URL`.
 
    When using an LLM running on your host machine (e.g., LM Studio), set
    `LLM_PROVIDER=local` and point `LOCAL_LLM_URL` to the host using
@@ -37,8 +44,13 @@ Run the service with Docker Compose:
 2. Start the container:
 
    ```bash
-docker-compose up --build
+   docker-compose up --build
    ```
+
+   The compose file builds from the repository root using
+   `services/api_service/Dockerfile`. The image copies the whole
+   project and sets `PYTHONPATH=/code/services`, allowing the orchestrator to
+   import every helper service with live reload.
 
 ### Direct service calls
 
@@ -67,7 +79,7 @@ Once the backend service is running, you can drive a sample interview using the 
 
 ## 5. WebSocket & Session Retrieval
 
-The Orchestration Service exposes WebSocket and read endpoints:
+The API service exposes WebSocket and read endpoints:
 
 - WebSocket: `ws://localhost:8003/api/v1/ws/{session_id}`
 - `GET http://localhost:8003/api/v1/sessions` — list sessions with start/end times.

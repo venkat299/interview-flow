@@ -3,12 +3,12 @@ import sys
 import sys
 from pathlib import Path
 
-sys.path.append(str(Path(__file__).resolve().parents[2]))
+sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 import pytest
 
-from ai_orchestration_service.session_service.interview_state import InterviewState
-from ai_orchestration_service.session_service.service import ConnectionManager
+from session_service.interview_state import InterviewState
+from session_service.service import ConnectionManager
 
 
 @pytest.mark.asyncio
@@ -38,12 +38,12 @@ async def test_next_question_has_feedback(monkeypatch):
         return "What is Python?"
 
     monkeypatch.setattr(
-        "ai_orchestration_service.session_service.service.generate_next_question",
+        "session_service.service.generate_next_question",
         fake_generate,
     )
     # Force deterministic feedback
     monkeypatch.setattr(
-        "ai_orchestration_service.session_service.service.random.choice",
+        "session_service.service.random.choice",
         lambda opts: "Great, let's move on.",
     )
 

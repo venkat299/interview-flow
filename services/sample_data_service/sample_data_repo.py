@@ -2,7 +2,7 @@ import os
 import sqlite3
 from typing import Dict, List, Optional
 
-from .config import settings
+from gateway_service.config import settings
 
 
 def _ensure_dir(path: str) -> None:

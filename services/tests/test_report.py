@@ -6,10 +6,10 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-sys.path.append(str(Path(__file__).resolve().parents[2]))
+sys.path.append(str(Path(__file__).resolve().parents[1]))
 
-from ai_orchestration_service.app.main import app
-from ai_orchestration_service.session_service import database as db
+from api_service.app.main import app
+from session_service import database as db
 
 
 @pytest.fixture
@@ -53,7 +53,7 @@ def test_report_endpoint(monkeypatch, tmp_path: Path, client):
         db_path=tmp_db,
     )
 
-    import ai_orchestration_service.app.main as app_main
+    import api_service.app.main as app_main
 
     monkeypatch.setattr(app_main, "db_get_session", lambda sid: db.get_session(sid, db_path=tmp_db))
     monkeypatch.setattr(app_main, "db_get_turns", lambda sid: db.get_conversation_turns(sid, db_path=tmp_db))

@@ -1,13 +1,13 @@
 import sys
 from pathlib import Path
 
-sys.path.append(str(Path(__file__).resolve().parents[2]))
+sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 import pytest
 from fastapi.testclient import TestClient
 
-from ai_orchestration_service.app.main import app
-from ai_orchestration_service.ai_gateway import gateway
+from api_service.app.main import app
+from gateway_service import gateway
 
 
 @pytest.fixture

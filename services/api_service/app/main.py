@@ -1,14 +1,14 @@
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
-from ai_orchestration_service.ai_orchestration import (
+from orchestrator_service.llm_api import (
     generate_next_question,
     create_interview_blueprint,
     on_question_selected,
     on_answer_scored,
     evaluate_candidate_answer,
 )
-from ai_orchestration_service.schemas import (
+from orchestrator_service.schemas import (
     InterviewRequest,
     InterviewResponse,
     InterviewContext,
@@ -16,8 +16,17 @@ from ai_orchestration_service.schemas import (
     EvaluationRequest,
     EvaluationResponse,
 )
+from sample_data_service import sample_data_repo as samples
+from session_service.service import ConnectionManager as WSConnectionManager
+from session_service.database import (
+    list_sessions as db_list_sessions,
+    get_session as db_get_session,
+    get_conversation_turns as db_get_turns,
+)
+from session_service.report import generate_report_pdf
+from fastapi.responses import Response
 
-app = FastAPI(title="AI Orchestration Service")
+app = FastAPI(title="API Service")
 
 app.add_middleware(
     CORSMiddleware,
@@ -59,7 +68,6 @@ async def evaluate_answer(request: EvaluationRequest) -> EvaluationResponse:
 
 
 # ---- Sample data endpoints (SQLite-backed) ----
-from ai_orchestration_service import sample_data_repo as samples
 
 
 @app.on_event("startup")
@@ -82,16 +90,6 @@ def get_sample(key: str):
 
 
 # ---- Integrated WebSocket + Session retrieval endpoints ----
-from ai_orchestration_service.session_service.service import (
-    ConnectionManager as WSConnectionManager,
-)
-from ai_orchestration_service.session_service.database import (
-    list_sessions as db_list_sessions,
-    get_session as db_get_session,
-    get_conversation_turns as db_get_turns,
-)
-from ai_orchestration_service.session_service.report import generate_report_pdf
-from fastapi.responses import Response
 
 ws_manager = WSConnectionManager()
 

@@ -1,12 +1,12 @@
 import sys
 from pathlib import Path
 
-sys.path.append(str(Path(__file__).resolve().parents[2]))
+sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 import pytest
 
-from ai_orchestration_service import ai_orchestration as ai
-from ai_orchestration_service.schemas import (
+from orchestrator_service import llm_api as ai
+from orchestrator_service.schemas import (
     InterviewContext,
     ConversationTurn,
     InterviewRequest,

@@ -1,7 +1,7 @@
 """AI Gateway for routing tasks to LLM providers.
 
 Adds support for selecting a local OpenAI-compatible LLM based on
-ai_orchestration_service.config.Settings. If a task is not present in the
+gateway_service.config.Settings. If a task is not present in the
 YAML router config, the gateway falls back to the provider specified in
 settings (default: "local").
 """
