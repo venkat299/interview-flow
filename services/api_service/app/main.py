@@ -130,6 +130,9 @@ async def auto_answer(session_id: str, payload: dict):
     - confidence_level: float in [0,1]
     - job_description: optional str
     - candidate_resume: optional str
+    - candidate_profile: optional str
+    - candidate_id: optional str
+    - job_id: optional int
     Returns: {"answer_text": str}
     """
     try:
@@ -139,6 +142,9 @@ async def auto_answer(session_id: str, payload: dict):
             float(payload.get("confidence_level", 0.7)),
             job_description=payload.get("job_description"),
             candidate_resume=payload.get("candidate_resume"),
+            candidate_profile=payload.get("candidate_profile"),
+            candidate_id=payload.get("candidate_id"),
+            job_id=payload.get("job_id"),
         )
     except ValueError as e:
         # session not found or no question

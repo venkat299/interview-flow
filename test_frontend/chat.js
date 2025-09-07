@@ -28,7 +28,10 @@ function initChat() {
     const ORCH_BASE = sessionStorage.getItem('AI_SERVICE_URL') || 'http://localhost:8003';
     const context = {
         job_description: sessionStorage.getItem('job_description') || '',
-        candidate_resume: sessionStorage.getItem('candidate_resume') || ''
+        candidate_resume: sessionStorage.getItem('candidate_resume') || '',
+        candidate_profile: sessionStorage.getItem('candidate_profile') || '',
+        candidate_id: sessionStorage.getItem('candidate_id') || '',
+        job_id: sessionStorage.getItem('job_id') || ''
     };
 
     const history = [];
@@ -289,7 +292,10 @@ function initChat() {
                 correctness_level: isNaN(corr) ? 0.8 : corr,
                 confidence_level: isNaN(conf) ? 0.7 : conf,
                 job_description: context.job_description || '',
-                candidate_resume: context.candidate_resume || ''
+                candidate_resume: context.candidate_resume || '',
+                candidate_profile: context.candidate_profile || '',
+                candidate_id: context.candidate_id || '',
+                job_id: context.job_id || ''
             };
             addLog('Auto-generating candidate answer...');
             const resp = await fetch(`${ORCH_BASE}/api/v1/sessions/${sessionId}/auto-answer`, {
