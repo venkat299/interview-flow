@@ -8,6 +8,12 @@
 </head>
 <body>
     <div class="container my-4">
+        <div class="d-flex justify-content-end mb-2">
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="auto-toggle">
+                <label class="form-check-label" for="auto-toggle">Auto-Answer (test)</label>
+            </div>
+        </div>
         <div id="persona-box" class="mb-3">
             <label for="persona-select" class="form-label">LLM Persona</label>
             <select id="persona-select" class="form-select w-auto">
@@ -15,6 +21,26 @@
                 <option value="strict_examiner">Strict Examiner</option>
                 <option value="casual_peer">Casual Peer</option>
             </select>
+        </div>
+
+        <div id="auto-controls" class="card card-body py-2 mb-3 d-none">
+            <div class="row g-3 align-items-center">
+                <div class="col-sm-6">
+                    <label for="correctness-slider" class="form-label mb-1">Correctness Level: <span id="correctness-val">0.80</span></label>
+                    <input type="range" class="form-range" id="correctness-slider" min="0" max="1" step="0.01" value="0.80">
+                </div>
+                <div class="col-sm-6">
+                    <label for="confidence-slider" class="form-label mb-1">Confidence Level: <span id="confidence-val">0.70</span></label>
+                    <input type="range" class="form-range" id="confidence-slider" min="0" max="1" step="0.01" value="0.70">
+                </div>
+                <div class="col-12 d-flex justify-content-between align-items-center">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="auto-send">
+                        <label class="form-check-label" for="auto-send">Auto-send answers</label>
+                    </div>
+                    <button id="auto-generate" class="btn btn-outline-primary btn-sm">Generate Answer</button>
+                </div>
+            </div>
         </div>
 
         <div id="metrics-box" class="mb-3">

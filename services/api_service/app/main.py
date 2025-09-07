@@ -23,7 +23,7 @@ from orchestrator_service.schemas import (
     EvaluationResponse,
 )
 from sample_data_service import sample_data_repo as samples
-from app_test_service import generate_candidate_for_job
+from app_test_service import generate_candidate_for_job, generate_auto_answer_for_session
 from session_service.service import ConnectionManager as WSConnectionManager
 from session_service.database import (
     list_sessions as db_list_sessions,
@@ -119,6 +119,30 @@ async def generate_candidate(job_id: int):
         return await generate_candidate_for_job(job_id)
     except ValueError:
         raise HTTPException(status_code=404, detail="Job not found")
+
+
+@app.post("/api/v1/sessions/{session_id}/auto-answer")
+async def auto_answer(session_id: str, payload: dict):
+    """Generate a candidate-style answer to the latest question for the session.
+
+    Body JSON:
+    - correctness_level: float in [0,1]
+    - confidence_level: float in [0,1]
+    - job_description: optional str
+    - candidate_resume: optional str
+    Returns: {"answer_text": str}
+    """
+    try:
+        return await generate_auto_answer_for_session(
+            session_id,
+            float(payload.get("correctness_level", 0.8)),
+            float(payload.get("confidence_level", 0.7)),
+            job_description=payload.get("job_description"),
+            candidate_resume=payload.get("candidate_resume"),
+        )
+    except ValueError as e:
+        # session not found or no question
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 # ---- Integrated WebSocket + Session retrieval endpoints ----

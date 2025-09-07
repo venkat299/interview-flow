@@ -15,6 +15,15 @@ function initChat() {
     const interviewTimerEl = document.getElementById('interview-timer');
     const wordCounterEl = document.getElementById('word-counter');
     const turnTimerEl = document.getElementById('turn-timer');
+    // Auto-answer controls
+    const autoToggle = document.getElementById('auto-toggle');
+    const autoControls = document.getElementById('auto-controls');
+    const correctnessSlider = document.getElementById('correctness-slider');
+    const confidenceSlider = document.getElementById('confidence-slider');
+    const correctnessVal = document.getElementById('correctness-val');
+    const confidenceVal = document.getElementById('confidence-val');
+    const autoGenerateBtn = document.getElementById('auto-generate');
+    const autoSend = document.getElementById('auto-send');
 
     const ORCH_BASE = sessionStorage.getItem('AI_SERVICE_URL') || 'http://localhost:8003';
     const context = {
@@ -34,6 +43,7 @@ function initChat() {
     let turnStart = null;
     let turnInterval = null;
     let totalWords = 0;
+    let lastQuestionText = '';
 
     function toWS(url) {
         try {
@@ -238,8 +248,13 @@ function initChat() {
                     questionStats[t][d] = (questionStats[t][d] || 0) + 1;
                     updateStatsTable();
                 }
+                lastQuestionText = q || '';
                 setThinking(false);
                 resetTurnTimer();
+                // Auto-generate answer if toggled on
+                if (autoToggle && autoToggle.checked && lastQuestionText) {
+                    requestAutoAnswer();
+                }
             } else if (event === 'interview_ended') {
                 setThinking(false);
                 addMessage('interviewer', 'Interview ended. Thank you for your time.');
@@ -263,6 +278,42 @@ function initChat() {
                 }).catch(() => {});
             }
         };
+    }
+
+    async function requestAutoAnswer() {
+        if (!sessionId) return;
+        try {
+            const corr = parseFloat(correctnessSlider ? correctnessSlider.value : '0.8');
+            const conf = parseFloat(confidenceSlider ? confidenceSlider.value : '0.7');
+            const body = {
+                correctness_level: isNaN(corr) ? 0.8 : corr,
+                confidence_level: isNaN(conf) ? 0.7 : conf,
+                job_description: context.job_description || '',
+                candidate_resume: context.candidate_resume || ''
+            };
+            addLog('Auto-generating candidate answer...');
+            const resp = await fetch(`${ORCH_BASE}/api/v1/sessions/${sessionId}/auto-answer`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const data = await resp.json();
+            const answer = (data && (data.answer_text || data.text)) || '';
+            if (answer) {
+                chatInput.value = answer;
+                addLog('Auto answer populated in input.');
+                if (autoSend && autoSend.checked) {
+                    // Send immediately if requested
+                    sendMessage();
+                }
+            } else {
+                addLog('Auto-answer returned empty text.');
+            }
+        } catch (e) {
+            console.error('Auto-answer failed', e);
+            addLog('Auto-answer failed');
+        }
     }
 
     function sendMessage() {
@@ -333,6 +384,32 @@ function initChat() {
             addLog(`Persona switched to ${p}`);
         });
     }
+
+    // Init and bind auto-answer UI
+    if (autoToggle && autoControls) {
+        autoToggle.addEventListener('change', () => {
+            if (autoToggle.checked) {
+                autoControls.classList.remove('d-none');
+                // If a question is already present and input is empty, generate now
+                if (lastQuestionText && !chatInput.value) {
+                    requestAutoAnswer();
+                }
+            } else {
+                autoControls.classList.add('d-none');
+            }
+        });
+    }
+    const updateSliderLabels = () => {
+        if (correctnessSlider && correctnessVal) correctnessVal.textContent = parseFloat(correctnessSlider.value).toFixed(2);
+        if (confidenceSlider && confidenceVal) confidenceVal.textContent = parseFloat(confidenceSlider.value).toFixed(2);
+    };
+    if (correctnessSlider) correctnessSlider.addEventListener('input', updateSliderLabels);
+    if (confidenceSlider) confidenceSlider.addEventListener('input', updateSliderLabels);
+    if (autoGenerateBtn) autoGenerateBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        requestAutoAnswer();
+    });
+    updateSliderLabels();
 
     if (statusSpinner) statusSpinner.classList.remove('d-none');
     if (statusText) statusText.textContent = 'Connecting...';
