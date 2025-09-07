@@ -1,12 +1,12 @@
 """Lightweight orchestrator coordinating interview flow."""
 from typing import List, Dict, Optional, Callable
 
-from ai_orchestration_service.schemas import (
+from .schemas import (
     InterviewContext,
     ConversationTurn,
     InterviewRequest,
 )
-from ai_orchestration_service.ai_orchestration import (
+from .llm_api import (
     generate_introductory_question,
     generate_soft_skill_question,
 )

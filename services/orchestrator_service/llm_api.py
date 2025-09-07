@@ -9,8 +9,8 @@ from .schemas import (
     EvaluationRequest,
     EvaluationResponse,
 )
-from .ai_gateway import gateway
-from .personas import PERSONA_PROMPTS
+from gateway_service import gateway
+from interviewer_service.personas import PERSONA_PROMPTS
 from interviewer_service import LLMInterviewer
 from monitor_service import LLMMonitor
 from scoring_service import ScoringEngine
