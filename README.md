@@ -86,3 +86,31 @@ The API service exposes WebSocket and read endpoints:
 - `GET http://localhost:8003/api/v1/sessions/{session_id}` — fetch a session with parsed `blueprint`, `rubric`, `transcript`, and the per-turn `turns` log.
 
 Adjust the base URL/port to match your deployment.
+
+## 6. Logging & Tracing
+
+Configure verbosity via environment variables (consumed by `gateway_service.config.Settings`):
+
+- `LOG_LEVEL`: One of `TRACE`, `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`. Use `TRACE` for the most granular output.
+- `TRACE_CALLS`: Set to `true`/`1` to log function CALL/RETURN events across service modules.
+- `TRACE_MODULE_PREFIXES`: Comma-separated module prefixes to trace (e.g., `api_service,orchestrator_service`). If empty, path-based filter applies.
+- `TRACE_FILE_PATH_CONTAINS`: Comma-separated path substrings; any file path containing one is traced. Default: `services/` (traces all repo-owned code).
+- `TRACE_CONCISE`: If `true`, prints concise trace lines without timestamp/level, e.g., `CALL module.func` and `RET module.func`.
+
+Example `.env` snippet to enable deep tracing:
+
+```
+LOG_LEVEL=TRACE
+TRACE_CALLS=true
+# You can leave module prefixes empty and rely on path filter
+TRACE_MODULE_PREFIXES=
+TRACE_FILE_PATH_CONTAINS=services/
+TRACE_CONCISE=true
+```
+
+With tracing enabled, the app logs every function call/return for modules matching the prefixes, e.g.:
+
+```
+2025-01-01 12:00:00 TRACE trace.calls CALL services.session_service.service.handle_message (/code/services/session_service/service.py:69)
+2025-01-01 12:00:00 TRACE trace.calls RET  services.session_service.service.handle_message
+```

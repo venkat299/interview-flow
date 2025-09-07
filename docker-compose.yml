@@ -7,6 +7,13 @@ services:
       dockerfile: services/api_service/Dockerfile
     environment:
       PYTHONPATH: /code/services
+      # Enable granular call tracing in app logs
+      LOG_LEVEL: TRACE
+      TRACE_CALLS: "true"
+      # Trace all repo user code under services/
+      TRACE_FILE_PATH_CONTAINS: services/
+      # Print concise trace lines (CALL/RET only)
+      TRACE_CONCISE: "true"
     ports:
       - "8003:8000"
     volumes:

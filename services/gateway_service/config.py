@@ -19,6 +19,25 @@ class Settings:
         "LOCAL_LLM_URL", "https://8cb5852bd7fb.ngrok-free.app/v1/chat/completions"
     )
 
+    # --- Logging / Tracing configuration ---
+    # Standard log level: DEBUG, INFO, WARNING, ERROR, CRITICAL, or TRACE (custom)
+    log_level: str = os.getenv("LOG_LEVEL", "DEBUG")
+
+    # Enable function call tracing across service modules (very verbose)
+    # You can enable this either by setting LOG_LEVEL=TRACE or TRACE_CALLS=true.
+    trace_calls: bool = os.getenv("TRACE_CALLS", "").strip().lower() in {"1", "true", "yes", "y"}
+
+    # Comma-separated list of module prefixes to trace, e.g. "api_service,orchestrator_service"
+    # If empty, path-based filter will be used.
+    trace_module_prefixes: str = os.getenv("TRACE_MODULE_PREFIXES", "")
+
+    # Comma-separated substrings; any file path containing one of these will be traced.
+    # Defaults to tracing code under the repo's services directory.
+    trace_file_path_contains: str = os.getenv("TRACE_FILE_PATH_CONTAINS", "services/")
+
+    # Concise output for trace logs (message only: CALL/RET and function)
+    trace_concise: bool = os.getenv("TRACE_CONCISE", "").strip().lower() in {"1", "true", "yes", "y"}
+
     # Timeout (in seconds) for outgoing HTTP requests to LLM providers
     # Increase default read timeout to accommodate slower local models.
     llm_timeout: float = float(os.getenv("LLM_TIMEOUT", "60"))

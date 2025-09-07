@@ -1,6 +1,12 @@
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
+# Initialize logging/tracing as early as possible
+from gateway_service.config import settings
+from common.logging_config import setup_from_settings
+
+setup_from_settings(settings)
+
 from orchestrator_service.llm_api import (
     generate_next_question,
     create_interview_blueprint,
