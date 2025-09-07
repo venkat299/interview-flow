@@ -52,6 +52,29 @@ def init_db() -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS candidates (
+                candidate_id TEXT PRIMARY KEY,
+                job_id INTEGER NOT NULL,
+                profile TEXT NOT NULL,
+                resume TEXT NOT NULL,
+                FOREIGN KEY(job_id) REFERENCES job_postings(id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS candidate_sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                candidate_id TEXT NOT NULL,
+                job_id INTEGER NOT NULL,
+                session_id TEXT NOT NULL,
+                FOREIGN KEY(candidate_id) REFERENCES candidates(candidate_id),
+                FOREIGN KEY(job_id) REFERENCES job_postings(id)
+            )
+            """
+        )
         conn.commit()
 
 
@@ -150,3 +173,44 @@ def get_candidate_resume(candidate_id: str) -> Optional[Dict[str, Any]]:
             "resume": row["resume"],
             "job_id": row["job_id"],
         }
+
+
+def upsert_candidate(candidate_id: str, job_id: int, profile: str, resume: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO candidates(candidate_id, job_id, profile, resume)
+            VALUES(?,?,?,?)
+            """,
+            (candidate_id, job_id, profile, resume),
+        )
+        conn.commit()
+
+
+def get_candidate(candidate_id: str) -> Optional[Dict[str, Any]]:
+    with get_connection() as conn:
+        cur = conn.execute(
+            "SELECT candidate_id, job_id, profile, resume FROM candidates WHERE candidate_id = ?",
+            (candidate_id,),
+        )
+        row = cur.fetchone()
+        if not row:
+            return None
+        return {
+            "candidate_id": row["candidate_id"],
+            "job_id": row["job_id"],
+            "profile": row["profile"],
+            "resume": row["resume"],
+        }
+
+
+def link_candidate_session(candidate_id: str, job_id: int, session_id: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO candidate_sessions(candidate_id, job_id, session_id)
+            VALUES(?,?,?)
+            """,
+            (candidate_id, job_id, session_id),
+        )
+        conn.commit()

@@ -98,10 +98,12 @@
                 parts.push(`Required Qualifications:\n${bullets}`);
             }
             jobDescEl.value = parts.join('\n\n');
+            sessionStorage.setItem('job_id', id);
             if (testingMode) {
                 const gen = await fetch(`${AI_SERVICE_URL}/app-test/generate-candidate/${id}`, { method: 'POST' });
                 const cand = await gen.json();
                 if (cand.candidate_id) sessionStorage.setItem('candidate_id', cand.candidate_id);
+                if (cand.profile) sessionStorage.setItem('candidate_profile', JSON.stringify(cand.profile));
                 resumeEl.value = cand.resume || '';
             }
             updateStartButtonState();
@@ -163,6 +165,10 @@
         sessionStorage.setItem('candidate_resume', resume);
         const cid = sessionStorage.getItem('candidate_id') || '';
         sessionStorage.setItem('candidate_id', cid);
+        const cprof = sessionStorage.getItem('candidate_profile') || '';
+        sessionStorage.setItem('candidate_profile', cprof);
+        const jobId = sessionStorage.getItem('job_id') || '';
+        sessionStorage.setItem('job_id', jobId);
         sessionStorage.setItem('time_limit', timeLimit);
         sessionStorage.setItem('word_limit', wordLimit);
         window.location.href = 'chat.html';
