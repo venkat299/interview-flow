@@ -24,6 +24,14 @@
             <textarea id="resume" class="form-control mb-3" placeholder="Paste your resume here"></textarea>
             <button id="start-button" class="btn btn-primary w-100">Start Interview</button>
         </div>
+
+        <div class="card p-4 mx-auto mt-4" style="max-width: 600px;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="mb-0">Past Sessions</h5>
+                <button id="refresh-sessions" class="btn btn-sm btn-outline-secondary">Refresh</button>
+            </div>
+            <div id="sessions-container" class="list-group small"></div>
+        </div>
     </div>
     <script>
 
@@ -31,6 +39,8 @@
     // Share with chat page
     try { sessionStorage.setItem('AI_SERVICE_URL', AI_SERVICE_URL); } catch (e) {}
     const select = document.getElementById('prefill-select');
+    const sessionsContainer = document.getElementById('sessions-container');
+    const refreshBtn = document.getElementById('refresh-sessions');
 
     async function loadSamples() {
         try {
@@ -78,8 +88,32 @@
         sessionStorage.setItem('word_limit', wordLimit);
         window.location.href = 'chat.html';
     });
-    // bootstrap: load sample options on page load
+    
+    async function loadSessions() {
+        try {
+            const resp = await fetch(`${AI_SERVICE_URL}/api/v1/sessions`);
+            const data = await resp.json();
+            sessionsContainer.innerHTML = '';
+            (data.items || []).forEach(sess => {
+                const item = document.createElement('div');
+                item.className = 'list-group-item d-flex justify-content-between align-items-center';
+                const start = sess.start_time ? new Date(sess.start_time).toLocaleString() : '';
+                item.innerHTML = `
+                    <div><code>${sess.session_id}</code><br/><small>${start}</small></div>
+                    <a href="${AI_SERVICE_URL}/api/v1/sessions/${sess.session_id}/report" target="_blank" class="btn btn-sm btn-outline-primary">Report</a>
+                `;
+                sessionsContainer.appendChild(item);
+            });
+        } catch (e) {
+            console.error('Failed to load sessions', e);
+        }
+    }
+
+    refreshBtn.addEventListener('click', loadSessions);
+
+    // bootstrap: load sample options and sessions on page load
     loadSamples();
+    loadSessions();
     </script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
