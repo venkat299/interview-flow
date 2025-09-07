@@ -1,12 +1,14 @@
 # In interview-flow-dev/docker-compose.yml
 
 services:
-  ai_orchestration_service:
+  api_service:
     build:
-      context: ./services/ai_orchestration_service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: services/api_service/Dockerfile
+    environment:
+      PYTHONPATH: /code/services
     ports:
       - "8003:8000"
     volumes:
-      - ./services/ai_orchestration_service:/code/ai_orchestration_service
-    command: uvicorn ai_orchestration_service.app.main:app --host 0.0.0.0 --port 8000 --reload
+      - .:/code
+    command: uvicorn api_service.app.main:app --host 0.0.0.0 --port 8000 --reload

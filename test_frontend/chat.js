@@ -210,6 +210,10 @@ function initChat() {
                 blueprint = payload;
                 initStatsFromBlueprint(blueprint);
                 addLog('Interview started');
+                if (payload && Array.isArray(payload.topics)) {
+                    const names = payload.topics.map(t => t.name).join(', ');
+                    addLog(`Topics: ${names}`);
+                }
             } else if (event === 'interviewer_typing') {
                 setThinking(true);
             } else if (event === 'evaluation') {
@@ -247,6 +251,16 @@ function initChat() {
                 if (reportButton) reportButton.disabled = false;
                 if (statusText) statusText.textContent = 'Interview ended';
                 stopTimers();
+                fetch(`${ORCH_BASE}/api/v1/sessions/${sessionId}`).then(r => r.json()).then(data => {
+                    if (data && rubricBody) {
+                        const score = data.final_score != null ? data.final_score : 'N/A';
+                        const summaryText = data.summary ? `<div class="mt-2">${marked.parse(data.summary)}</div>` : '';
+                        rubricBody.innerHTML = `
+                            <div><strong>Final Score:</strong> ${score}</div>
+                            ${summaryText}
+                        `;
+                    }
+                }).catch(() => {});
             }
         };
     }
