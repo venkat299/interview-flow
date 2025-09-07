@@ -15,24 +15,11 @@
             </div>
         </div>
         <div class="card p-4 mx-auto" style="max-width: 900px;">
-            <select id="prefill-select" class="form-select mb-3">
-                <option value="">-- Select job posting --</option>
-            </select>
-
-            <select id="limit-select" class="form-select mb-3">
-                <option value="900" data-words="1500">15 minutes</option>
-                <option value="1200" data-words="2000">20 minutes</option>
-                <option value="1500" data-words="2500">25 minutes</option>
-                <option value="1800" data-words="3000">30 minutes</option>
-            </select>
-
-            <div class="row g-3">
-                <div class="col-md-6">
-                    <textarea id="job-description" class="form-control" placeholder="Job description"></textarea>
-                </div>
-                <div class="col-md-6">
-                    <textarea id="resume" class="form-control" placeholder="Paste your resume here"></textarea>
-                </div>
+            <div class="mb-3">
+                <textarea id="job-description" class="form-control" placeholder="Job description"></textarea>
+            </div>
+            <div class="mb-3">
+                <textarea id="resume" class="form-control" placeholder="Paste your resume here"></textarea>
             </div>
             <button id="start-button" class="btn btn-primary w-100">Start Interview</button>
         </div>
@@ -71,7 +58,6 @@
     const AI_SERVICE_URL = 'http://localhost:8003';
     // Share with chat page
     try { sessionStorage.setItem('AI_SERVICE_URL', AI_SERVICE_URL); } catch (e) {}
-    const select = document.getElementById('prefill-select');
     const postingsTbody = document.getElementById('job-postings-tbody');
     const sessionsContainer = document.getElementById('sessions-container');
     const refreshBtn = document.getElementById('refresh-sessions');
@@ -83,61 +69,10 @@
         testingMode = testToggle.checked;
     });
 
-    function renderJobPostings(items) {
-        if (!Array.isArray(items) || items.length === 0) {
-            postingsTbody.innerHTML = '<tr><td colspan="3" class="text-muted">No job postings found</td></tr>';
-            return;
-        }
-        postingsTbody.innerHTML = '';
-        for (const item of items) {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td><code>${item.id}</code></td>
-                <td>${item.job_title}</td>
-                <td>
-                    <button class="btn btn-sm btn-outline-primary" data-id="${item.id}">Select</button>
-                </td>
-            `;
-            postingsTbody.appendChild(tr);
-        }
-        // Delegate click to tbody for performance
-        postingsTbody.onclick = async (ev) => {
-            const btn = ev.target.closest('button[data-id]');
-            if (!btn) return;
-            const id = btn.getAttribute('data-id');
-            select.value = id;
-            // Trigger the same behavior as manual select change
-            const event = new Event('change');
-            select.dispatchEvent(event);
-        };
-    }
-
-    async function loadJobPostings() {
-        try {
-            const resp = await fetch(`${AI_SERVICE_URL}/job-postings`);
-            const data = await resp.json();
-            const items = data.items || [];
-            // Populate dropdown
-            for (const item of items) {
-                const opt = document.createElement('option');
-                opt.value = item.id;
-                opt.textContent = item.job_title;
-                select.appendChild(opt);
-            }
-            // Populate table
-            renderJobPostings(items);
-        } catch (e) {
-            console.error('Failed to load job postings', e);
-        }
-    }
-
-    select.addEventListener('change', async () => {
-        const id = select.value;
+    async function applyJobSelection(id) {
         document.getElementById('job-description').value = '';
         document.getElementById('resume').value = '';
-        if (!id) {
-            return;
-        }
+        if (!id) return;
         try {
             const resp = await fetch(`${AI_SERVICE_URL}/job-postings/${id}`);
             const item = await resp.json();
@@ -161,15 +96,53 @@
         } catch (e) {
             console.error('Failed to load job', e);
         }
-    });
+    }
+
+    function renderJobPostings(items) {
+        if (!Array.isArray(items) || items.length === 0) {
+            postingsTbody.innerHTML = '<tr><td colspan="3" class="text-muted">No job postings found</td></tr>';
+            return;
+        }
+        postingsTbody.innerHTML = '';
+        for (const item of items) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><code>${item.id}</code></td>
+                <td>${item.job_title}</td>
+                <td>
+                    <button class="btn btn-sm btn-outline-primary" data-id="${item.id}">Select</button>
+                </td>
+            `;
+            postingsTbody.appendChild(tr);
+        }
+        // Delegate click to tbody for performance
+        postingsTbody.onclick = async (ev) => {
+            const btn = ev.target.closest('button[data-id]');
+            if (!btn) return;
+            const id = btn.getAttribute('data-id');
+            await applyJobSelection(id);
+        };
+    }
+
+    async function loadJobPostings() {
+        try {
+            const resp = await fetch(`${AI_SERVICE_URL}/job-postings`);
+            const data = await resp.json();
+            const items = data.items || [];
+            // Populate table
+            renderJobPostings(items);
+        } catch (e) {
+            console.error('Failed to load job postings', e);
+        }
+    }
 
 
     document.getElementById('start-button').addEventListener('click', () => {
         const jd = document.getElementById('job-description').value;
         const resume = document.getElementById('resume').value;
-        const limitSelect = document.getElementById('limit-select');
-        const timeLimit = parseInt(limitSelect.value, 10);
-        const wordLimit = parseInt(limitSelect.options[limitSelect.selectedIndex].dataset.words || '0', 10);
+        // Defaults after removing time/word dropdowns
+        const timeLimit = 900; // 15 minutes
+        const wordLimit = 1500; // ~1500 words
         sessionStorage.setItem('job_description', jd);
         sessionStorage.setItem('candidate_resume', resume);
         const cid = sessionStorage.getItem('candidate_id') || '';
@@ -201,8 +174,6 @@
 
     refreshBtn.addEventListener('click', loadSessions);
     refreshPostingsBtn.addEventListener('click', async () => {
-        // Reset dropdown options to keep placeholder + rebuild
-        select.innerHTML = '<option value="">-- Select job posting --</option>';
         await loadJobPostings();
     });
 

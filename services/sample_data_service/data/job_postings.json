@@ -9,14 +9,20 @@
       "category": "Software Development",
       "description": "Seeking a motivated Junior Frontend Developer to build and maintain user-facing features for our web applications.",
       "responsibilities": [
-        "Develop new user-facing features using React.js.",
-        "Translate designs and wireframes into high-quality code.",
-        "Optimize components for maximum performance across a vast array of web-capable devices and browsers."
+        "Develop, test, and deploy new user-facing features using React.js and modern JavaScript (ES6+).",
+        "Collaborate closely with UI/UX designers to translate wireframes and mockups into responsive, high-quality code.",
+        "Participate in code reviews to maintain code quality, identify potential issues, and share knowledge with the team.",
+        "Optimize components for maximum performance across a vast array of web-capable devices and browsers, ensuring cross-browser compatibility.",
+        "Integrate with backend services by consuming RESTful APIs and handling asynchronous requests.",
+        "Troubleshoot and debug issues reported by QA or users to ensure a smooth user experience."
       ],
       "required_qualifications": [
-        "Proficiency in HTML, CSS, and JavaScript.",
-        "Basic understanding of React.js or a similar modern framework (Vue, Angular).",
-        "Familiarity with RESTful APIs."
+        "Solid proficiency in HTML5, CSS3, and JavaScript.",
+        "Hands-on experience with React.js and understanding of its core principles (components, state, props).",
+        "Familiarity with version control systems, particularly Git and Git workflows (e.g., branching, merging).",
+        "Basic understanding of RESTful APIs and how to interact with them using tools like Fetch or Axios.",
+        "Knowledge of package managers like npm or yarn.",
+        "A portfolio of projects (personal or professional) that demonstrates frontend development skills."
       ]
     },
     {
@@ -28,14 +34,20 @@
       "category": "Data Science",
       "description": "We are looking for an experienced Data Scientist to apply data mining techniques and conduct statistical analysis to help us make strategic decisions.",
       "responsibilities": [
-        "Build and implement machine learning models.",
-        "Perform ad-hoc analysis and present results in a clear manner.",
-        "Collaborate with product and engineering teams to understand business needs."
+        "Lead the end-to-end lifecycle of machine learning projects, from problem formulation and data collection to model deployment and monitoring.",
+        "Design and implement advanced statistical models and machine learning algorithms (e.g., regression, classification, clustering, NLP, time-series forecasting).",
+        "Perform exploratory data analysis on large, complex datasets to identify actionable insights and hypotheses.",
+        "Communicate complex findings and recommendations to non-technical stakeholders in a clear, concise manner through visualizations and presentations.",
+        "Mentor junior data scientists and analysts, providing guidance on best practices and technical approaches.",
+        "Stay current with the latest research and advancements in data science and machine learning."
       ],
       "required_qualifications": [
-        "Strong experience with Python (pandas, NumPy, scikit-learn).",
-        "Expertise in statistical modeling and machine learning algorithms.",
-        "Proficiency in SQL and experience with large datasets."
+        "Master's or Ph.D. in a quantitative field like Computer Science, Statistics, or Mathematics.",
+        "Expert-level proficiency in Python and its data science libraries (pandas, NumPy, scikit-learn, Matplotlib).",
+        "Demonstrated experience in building and deploying machine learning models in a production environment.",
+        "Advanced proficiency in SQL for data extraction and manipulation from relational databases.",
+        "Experience with deep learning frameworks such as TensorFlow or PyTorch.",
+        "Excellent communication and storytelling skills."
       ]
     },
     {
@@ -47,14 +59,20 @@
       "category": "DevOps",
       "description": "Join our team to manage our cloud infrastructure and automate our operational processes.",
       "responsibilities": [
-        "Design, build, and maintain our CI/CD pipelines.",
-        "Manage cloud infrastructure on AWS.",
-        "Implement and manage containerization technologies like Docker and Kubernetes."
+        "Design, develop, and maintain scalable and reliable backend services and RESTful APIs using Python frameworks like Django or Flask.",
+        "Write clean, efficient, and well-documented code following best practices.",
+        "Integrate with databases (e.g., PostgreSQL, MySQL) using ORM libraries like Django ORM or SQLAlchemy.",
+        "Develop and maintain unit and integration tests to ensure code quality and reliability.",
+        "Collaborate with frontend developers to integrate user-facing elements with server-side logic.",
+        "Participate in code reviews and contribute to improving the team's development processes."
       ],
       "required_qualifications": [
-        "Experience with AWS services (EC2, S3, RDS, VPC).",
-        "Proficiency in scripting languages like Bash or Python.",
-        "Hands-on experience with Docker, Kubernetes, and Jenkins."
+        "Strong proficiency in Python and its standard library.",
+        "Hands-on experience with a web framework such as Django, Flask, or FastAPI.",
+        "Experience in designing and building RESTful APIs.",
+        "Familiarity with Object-Relational Mapping (ORM) libraries.",
+        "Proficient understanding of code versioning tools, especially Git.",
+        "Experience with writing unit tests using frameworks like PyTest or unittest."
       ]
     }
   ]
