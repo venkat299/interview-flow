@@ -1,0 +1,61 @@
+{
+  "job_postings": [
+    {
+      "id": 1,
+      "job_title": "Junior Frontend Developer",
+      "company": "WebWeavers Inc.",
+      "location": "Bengaluru, India",
+      "experience_level": "Entry-level (0-2 years)",
+      "category": "Software Development",
+      "description": "Seeking a motivated Junior Frontend Developer to build and maintain user-facing features for our web applications.",
+      "responsibilities": [
+        "Develop new user-facing features using React.js.",
+        "Translate designs and wireframes into high-quality code.",
+        "Optimize components for maximum performance across a vast array of web-capable devices and browsers."
+      ],
+      "required_qualifications": [
+        "Proficiency in HTML, CSS, and JavaScript.",
+        "Basic understanding of React.js or a similar modern framework (Vue, Angular).",
+        "Familiarity with RESTful APIs."
+      ]
+    },
+    {
+      "id": 2,
+      "job_title": "Senior Data Scientist",
+      "company": "DataDriven Insights",
+      "location": "Hyderabad, India",
+      "experience_level": "Senior (5-8 years)",
+      "category": "Data Science",
+      "description": "We are looking for an experienced Data Scientist to apply data mining techniques and conduct statistical analysis to help us make strategic decisions.",
+      "responsibilities": [
+        "Build and implement machine learning models.",
+        "Perform ad-hoc analysis and present results in a clear manner.",
+        "Collaborate with product and engineering teams to understand business needs."
+      ],
+      "required_qualifications": [
+        "Strong experience with Python (pandas, NumPy, scikit-learn).",
+        "Expertise in statistical modeling and machine learning algorithms.",
+        "Proficiency in SQL and experience with large datasets."
+      ]
+    },
+    {
+      "id": 3,
+      "job_title": "DevOps Engineer",
+      "company": "CloudScape Solutions",
+      "location": "Pune, India",
+      "experience_level": "Mid-level (3-5 years)",
+      "category": "DevOps",
+      "description": "Join our team to manage our cloud infrastructure and automate our operational processes.",
+      "responsibilities": [
+        "Design, build, and maintain our CI/CD pipelines.",
+        "Manage cloud infrastructure on AWS.",
+        "Implement and manage containerization technologies like Docker and Kubernetes."
+      ],
+      "required_qualifications": [
+        "Experience with AWS services (EC2, S3, RDS, VPC).",
+        "Proficiency in scripting languages like Bash or Python.",
+        "Hands-on experience with Docker, Kubernetes, and Jenkins."
+      ]
+    }
+  ]
+}

@@ -12,7 +12,8 @@ from gateway_service import gateway
 
 @pytest.fixture
 def client():
-    return TestClient(app)
+    with TestClient(app) as c:
+        yield c
 
 
 def test_generate_question_endpoint(monkeypatch, client):
@@ -80,3 +81,46 @@ def test_evaluate_answer_endpoint(monkeypatch, client):
     resp = client.post("/evaluate-answer", json=payload)
     assert resp.status_code == 200
     assert resp.json()["score"] == 9
+
+
+def test_job_postings_and_resumes(client):
+    resp = client.get("/job-postings")
+    assert resp.status_code == 200
+    items = resp.json()["items"]
+    assert any(it["id"] == 1 for it in items)
+
+    resp = client.get("/job-postings/1")
+    assert resp.status_code == 200
+    assert resp.json()["job_title"] == "Junior Frontend Developer"
+
+    resume_payload = {
+        "candidate_id": "cand1",
+        "resume": "Skilled developer",
+        "job_id": 1,
+    }
+    resp = client.post("/candidate-resumes", json=resume_payload)
+    assert resp.status_code == 200
+
+    resp = client.get("/candidate-resumes/cand1")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["job_id"] == 1
+
+
+def test_app_test_generate_candidate(monkeypatch, client):
+    async def fake_execute(task_name, system_prompt, user_prompt=None):
+        return {"resume": "Generated resume"}
+
+    monkeypatch.setattr(gateway, "execute_task", fake_execute)
+
+    resp = client.post("/app-test/generate-candidate/1")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["resume"] == "Generated resume"
+    assert data["candidate_id"]
+
+    # Verify resume stored
+    resp = client.get(f"/candidate-resumes/{data['candidate_id']}")
+    assert resp.status_code == 200
+    stored = resp.json()
+    assert stored["resume"] == "Generated resume" and stored["job_id"] == 1

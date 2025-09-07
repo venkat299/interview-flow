@@ -23,6 +23,7 @@ from orchestrator_service.schemas import (
     EvaluationResponse,
 )
 from sample_data_service import sample_data_repo as samples
+from app_test_service import generate_candidate_for_job
 from session_service.service import ConnectionManager as WSConnectionManager
 from session_service.database import (
     list_sessions as db_list_sessions,
@@ -81,18 +82,43 @@ def _startup_init_samples() -> None:
     samples.init_db()
     samples.seed_if_empty()
 
+@app.get("/job-postings")
+def list_job_postings():
+    return {"items": samples.list_job_postings()}
 
-@app.get("/samples")
-def list_samples():
-    return {"items": samples.list_samples()}
 
-
-@app.get("/samples/{key}")
-def get_sample(key: str):
-    item = samples.get_sample(key)
+@app.get("/job-postings/{job_id}")
+def get_job_posting(job_id: int):
+    item = samples.get_job_posting(job_id)
     if not item:
-        raise HTTPException(status_code=404, detail="Sample not found")
+        raise HTTPException(status_code=404, detail="Job not found")
     return item
+
+
+@app.post("/candidate-resumes")
+def upsert_candidate_resume(payload: dict):
+    samples.upsert_candidate_resume(
+        payload.get("candidate_id"),
+        payload.get("resume", ""),
+        int(payload.get("job_id")),
+    )
+    return {"status": "ok"}
+
+
+@app.get("/candidate-resumes/{candidate_id}")
+def get_candidate_resume(candidate_id: str):
+    item = samples.get_candidate_resume(candidate_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Resume not found")
+    return item
+
+
+@app.post("/app-test/generate-candidate/{job_id}")
+async def generate_candidate(job_id: int):
+    try:
+        return await generate_candidate_for_job(job_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Job not found")
 
 
 # ---- Integrated WebSocket + Session retrieval endpoints ----
