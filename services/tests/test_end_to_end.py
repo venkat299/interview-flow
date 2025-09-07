@@ -2,7 +2,7 @@ import sys
 from pathlib import Path
 import types
 
-sys.path.append(str(Path(__file__).resolve().parents[1]))
+sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 import pytest
 
@@ -20,7 +20,7 @@ from guardrails_service import filters
 from analytics_service import item_metrics
 from verification_service import prober
 from storage_service import storage
-from orchestrator_service import llm_api as ai
+from ai_orchestration_service import ai_orchestration as ai
 
 
 @pytest.mark.asyncio

@@ -10,7 +10,7 @@
   - Export `Orchestrator` for other services.
 
 ## Step 2 – Refactor WebSocket ConnectionManager
-- **File**: `services/session_service/service.py`
+- **File**: `services/ai_orchestration_service/session_service/service.py`
   - `ConnectionManager` delegates agenda & pacing to `Orchestrator` methods.
   - Replace inline question selection with orchestrator callbacks.
   - Expose hook `on_turn_complete(result)` for Monitor/Scoring modules.
@@ -79,9 +79,9 @@
 - **File**: `services/verification_service/__init__.py`
 
 ## Step 12 – Evaluation Pipeline Hooks
-- **File**: `services/orchestrator_service/llm_api.py`
+- **File**: `services/ai_orchestration_service/ai_orchestration.py`
   - Add orchestrator hooks `on_question_selected`, `on_answer_scored` to call Interviewer, Monitor, Scoring Engine.
-- **File**: `services/api_service/app/main.py`
+- **File**: `services/ai_orchestration_service/app/main.py`
   - Expose REST/WebSocket routes that broker requests across new services.
 
 ## Step 13 – Question Quality Analytics
@@ -99,7 +99,7 @@
 ## Step 15 – Orchestration Loop Integration
 - **File**: `services/orchestrator_service/orchestrator.py`
   - Add `loop()` implementing pseudocode: monitor → bank → interviewer → tools → scoring.
-- **File**: `services/session_service/service.py`
+- **File**: `services/ai_orchestration_service/session_service/service.py`
   - Replace internal loop with call to `Orchestrator.loop()` for each session.
 
 ## Step 16 – Performance & Modularity Notes

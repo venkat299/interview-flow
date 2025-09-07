@@ -3,17 +3,17 @@
 This document describes the end-to-end flow of the AI interview application, detailing how each service is initiated and interacts during a session.
 
 ## 1. Service Startup
-1. **FastAPI application** (`services/api_service/app/main.py`)
+1. **FastAPI application** (`services/ai_orchestration_service/app/main.py`)
     - Creates `FastAPI` instance.
     - Adds CORS middleware.
     - Registers REST endpoints for question generation, blueprint creation, answer evaluation, sample data, sessions, and report downloads.
     - On `startup`, seeds the sample SQLite database.
 
-2. **WebSocket Connection Manager** (`services/session_service/service.py`)
+2. **WebSocket Connection Manager** (`services/ai_orchestration_service/session_service/service.py`)
     - Instantiated in `main.py` as `ws_manager`.
     - Manages session state, history, timers, and communication over WebSocket.
 
-3. **AI Gateway** (`services/gateway_service/ai_gateway.py`)
+3. **AI Gateway** (`services/ai_orchestration_service/ai_gateway.py`)
     - Initializes on import; loads model routing config.
     - Exposes `gateway.execute_task` for LLM interactions used by orchestration functions.
 
@@ -27,7 +27,7 @@ This document describes the end-to-end flow of the AI interview application, det
 
 3. **Blueprint Generation**
     - `handle_message` receives `join_session`.
-    - Calls `create_interview_blueprint` → `llm_api.create_interview_blueprint` → `gateway.execute_task` to obtain structured topics.
+    - Calls `create_interview_blueprint` → `ai_orchestration.create_interview_blueprint` → `gateway.execute_task` to obtain structured topics.
     - Session record created in SQLite via `create_session`.
 
 4. **Initial Question**
@@ -41,7 +41,7 @@ This document describes the end-to-end flow of the AI interview application, det
 
 2. **Evaluation**
     - `_evaluate_answer` builds `EvaluationRequest` with last question and topic blueprint.
-    - `llm_api.evaluate_candidate_answer` invokes `gateway.execute_task` to produce score, depth, confidence, truthfulness.
+    - `ai_orchestration.evaluate_candidate_answer` invokes `gateway.execute_task` to produce score, depth, confidence, truthfulness.
     - Results logged to session DB via `log_turn`; `evaluation` event sent back.
 
 3. **State Update**
@@ -52,7 +52,7 @@ This document describes the end-to-end flow of the AI interview application, det
 4. **Next Question**
     - `_next_question` composes follow-up:
         - Builds `InterviewRequest` with context, conversation history, topic, difficulty.
-        - `llm_api.generate_next_question` calls `gateway.execute_task`.
+        - `ai_orchestration.generate_next_question` calls `gateway.execute_task`.
         - Prefaces question with randomized feedback string.
     - `new_question` event sent to client.
 

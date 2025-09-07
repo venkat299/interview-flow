@@ -6,12 +6,13 @@ from typing import Dict, List, Optional
 from fastapi import WebSocket
 
 from orchestrator_service import Orchestrator
-from orchestrator_service.schemas import (
+
+from ai_orchestration_service.schemas import (
     InterviewContext,
     EvaluationRequest,
     TopicBlueprint,
 )
-from orchestrator_service.llm_api import (
+from ai_orchestration_service.ai_orchestration import (
     create_interview_blueprint,
     evaluate_candidate_answer,
     generate_final_summary,
