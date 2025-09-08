@@ -21,6 +21,14 @@
             <div class="mb-3">
                 <textarea id="resume" class="form-control" placeholder="Paste your resume here"></textarea>
             </div>
+            <div class="mb-3">
+                <label for="time-limit" class="form-label">Interview Duration</label>
+                <select id="time-limit" class="form-select">
+                    <option value="300" selected>5 minutes (default)</option>
+                    <option value="600">10 minutes</option>
+                    <option value="900">15 minutes</option>
+                </select>
+            </div>
             <button id="start-button" class="btn btn-primary w-100" disabled>Start Interview</button>
         </div>
 
@@ -158,8 +166,9 @@
     document.getElementById('start-button').addEventListener('click', () => {
         const jd = jobDescEl.value;
         const resume = resumeEl.value;
-        // Defaults after removing time/word dropdowns
-        const timeLimit = 900; // 15 minutes
+        // Read selected interview duration (seconds); default to 5 minutes
+        const sel = document.getElementById('time-limit');
+        const timeLimit = sel ? (parseInt(sel.value, 10) || 300) : 300;
         const wordLimit = 1500; // ~1500 words
         sessionStorage.setItem('job_description', jd);
         sessionStorage.setItem('candidate_resume', resume);
