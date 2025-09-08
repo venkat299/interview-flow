@@ -24,20 +24,38 @@
         </div>
 
         <div id="auto-controls" class="card card-body py-2 mb-3 d-none">
-            <div class="row g-3 align-items-center">
-                <div class="col-sm-6">
-                    <label for="correctness-slider" class="form-label mb-1">Correctness Level: <span id="correctness-val">0.80</span></label>
-                    <input type="range" class="form-range" id="correctness-slider" min="0" max="1" step="0.01" value="0.80">
+            <div class="row g-3 align-items-start">
+                <div class="col-md-4">
+                    <label for="confidence-select" class="form-label mb-1">Confidence</label>
+                    <select id="confidence-select" class="form-select form-select-sm">
+                        <option value="High">High</option>
+                        <option value="Medium" selected>Medium</option>
+                        <option value="Low">Low</option>
+                    </select>
                 </div>
-                <div class="col-sm-6">
-                    <label for="confidence-slider" class="form-label mb-1">Confidence Level: <span id="confidence-val">0.70</span></label>
-                    <input type="range" class="form-range" id="confidence-slider" min="0" max="1" step="0.01" value="0.70">
+                <div class="col-md-4">
+                    <label for="verbosity-select" class="form-label mb-1">Verbosity</label>
+                    <select id="verbosity-select" class="form-select form-select-sm">
+                        <option value="Concise">Concise</option>
+                        <option value="Balanced" selected>Balanced</option>
+                        <option value="Verbose">Verbose</option>
+                    </select>
                 </div>
-                <div class="col-12 d-flex justify-content-between align-items-center">
-                    <div class="form-check">
+                <div class="col-md-4 d-flex align-items-end">
+                    <div class="form-check ms-auto">
                         <input class="form-check-input" type="checkbox" id="auto-send">
                         <label class="form-check-label" for="auto-send">Auto-send answers</label>
                     </div>
+                </div>
+                <div class="col-12">
+                    <label class="form-label mb-1">Skill Matrix</label>
+                    <div id="skill-matrix-container"></div>
+                    <div class="d-flex align-items-center mt-2">
+                        <button id="reload-skill-matrix" class="btn btn-sm btn-outline-secondary me-2" type="button">Reload from profile</button>
+                        <div class="form-text">Use sliders to adjust proficiency (1–10). Prefills from candidate profile when available.</div>
+                    </div>
+                </div>
+                <div class="col-12 d-flex justify-content-end">
                     <button id="auto-generate" class="btn btn-outline-primary btn-sm">Generate Answer</button>
                 </div>
             </div>

@@ -18,10 +18,10 @@ function initChat() {
     // Auto-answer controls
     const autoToggle = document.getElementById('auto-toggle');
     const autoControls = document.getElementById('auto-controls');
-    const correctnessSlider = document.getElementById('correctness-slider');
-    const confidenceSlider = document.getElementById('confidence-slider');
-    const correctnessVal = document.getElementById('correctness-val');
-    const confidenceVal = document.getElementById('confidence-val');
+    const confidenceSelect = document.getElementById('confidence-select');
+    const verbositySelect = document.getElementById('verbosity-select');
+    const skillMatrixContainer = document.getElementById('skill-matrix-container');
+    const reloadSkillMatrixBtn = document.getElementById('reload-skill-matrix');
     const autoGenerateBtn = document.getElementById('auto-generate');
     const autoSend = document.getElementById('auto-send');
 
@@ -47,6 +47,87 @@ function initChat() {
     let turnInterval = null;
     let totalWords = 0;
     let lastQuestionText = '';
+    let skillMatrixState = [];
+
+    function updateCandidateProfileContext() {
+        try {
+            let prof = {};
+            if (context.candidate_profile) {
+                try { prof = JSON.parse(context.candidate_profile); } catch (_) { prof = {}; }
+            }
+            // Do not persist beyond this page; only update the in-memory context
+            const copy = (Array.isArray(skillMatrixState) ? skillMatrixState.map(it => ({
+                skill: it.skill,
+                category: it.category,
+                proficiency: it.proficiency,
+            })) : []);
+            prof.skill_matrix = copy;
+            context.candidate_profile = JSON.stringify(prof);
+            // Persist only to sessionStorage (not DB) so it survives reloads
+            try { sessionStorage.setItem('candidate_profile', context.candidate_profile); } catch (_) {}
+        } catch (_) {
+            // If anything goes wrong, keep existing context as-is
+        }
+    }
+
+    function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
+
+    function setSkillMatrixState(list) {
+        const arr = Array.isArray(list) ? list : [];
+        skillMatrixState = arr.map(it => ({
+            skill: String((it && it.skill) || '').trim(),
+            category: String((it && it.category) || '').trim(),
+            proficiency: clamp(parseInt((it && it.proficiency), 10) || 1, 1, 10),
+        })).filter(it => it.skill);
+        renderSkillMatrix();
+        updateCandidateProfileContext();
+    }
+
+    function renderSkillMatrix() {
+        if (!skillMatrixContainer) return;
+        if (!skillMatrixState.length) {
+            skillMatrixContainer.innerHTML = '<div class="text-muted small">No skill matrix found in profile. Use the job selector page to generate a profile, or proceed without it.</div>';
+            return;
+        }
+        skillMatrixContainer.innerHTML = '';
+        skillMatrixState.forEach((it, idx) => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'mb-2';
+            const cat = it.category ? ` <span class="text-muted">(${it.category})</span>` : '';
+            wrapper.innerHTML = `
+                <div class="d-flex justify-content-between">
+                    <label class="form-label small mb-1"><strong>${it.skill}</strong>${cat}</label>
+                    <span class="small"><span id="sm-val-${idx}">${it.proficiency}</span>/10</span>
+                </div>
+                <input type="range" class="form-range" min="1" max="10" step="1" value="${it.proficiency}" data-index="${idx}">
+            `;
+            skillMatrixContainer.appendChild(wrapper);
+        });
+        const inputs = skillMatrixContainer.querySelectorAll('input[type="range"][data-index]');
+        inputs.forEach(input => {
+            input.addEventListener('input', (e) => {
+                const i = parseInt(e.target.getAttribute('data-index'), 10);
+                const val = clamp(parseInt(e.target.value, 10) || 1, 1, 10);
+                if (skillMatrixState[i]) skillMatrixState[i].proficiency = val;
+                const valEl = document.getElementById(`sm-val-${i}`);
+                if (valEl) valEl.textContent = String(val);
+                updateCandidateProfileContext();
+            });
+        });
+    }
+
+    function loadSkillMatrixFromCandidateProfile() {
+        try {
+            const profStr = sessionStorage.getItem('candidate_profile') || '';
+            if (!profStr) { setSkillMatrixState([]); return; }
+            const prof = JSON.parse(profStr);
+            const sm = prof && prof.skill_matrix;
+            if (Array.isArray(sm) && sm.length) setSkillMatrixState(sm);
+            else setSkillMatrixState([]);
+        } catch (_) {
+            setSkillMatrixState([]);
+        }
+    }
 
     function toWS(url) {
         try {
@@ -286,11 +367,17 @@ function initChat() {
     async function requestAutoAnswer() {
         if (!sessionId) return;
         try {
-            const corr = parseFloat(correctnessSlider ? correctnessSlider.value : '0.8');
-            const conf = parseFloat(confidenceSlider ? confidenceSlider.value : '0.7');
+            // Collect current skill matrix from sliders
+            const skill_matrix = (Array.isArray(skillMatrixState) && skillMatrixState.length) ? skillMatrixState : null;
+            const confidence = (confidenceSelect && confidenceSelect.value) || 'Medium';
+            const verbosity = (verbositySelect && verbositySelect.value) || 'Balanced';
+            // Ensure context carries the updated profile before sending
+            updateCandidateProfileContext();
             const body = {
-                correctness_level: isNaN(corr) ? 0.8 : corr,
-                confidence_level: isNaN(conf) ? 0.7 : conf,
+                // New controls
+                confidence,
+                verbosity,
+                skill_matrix,
                 job_description: context.job_description || '',
                 candidate_resume: context.candidate_resume || '',
                 candidate_profile: context.candidate_profile || '',
@@ -405,17 +492,25 @@ function initChat() {
             }
         });
     }
-    const updateSliderLabels = () => {
-        if (correctnessSlider && correctnessVal) correctnessVal.textContent = parseFloat(correctnessSlider.value).toFixed(2);
-        if (confidenceSlider && confidenceVal) confidenceVal.textContent = parseFloat(confidenceSlider.value).toFixed(2);
-    };
-    if (correctnessSlider) correctnessSlider.addEventListener('input', updateSliderLabels);
-    if (confidenceSlider) confidenceSlider.addEventListener('input', updateSliderLabels);
+    // Prefill auto-controls from candidate_profile, if present
+    try {
+        const profStr = sessionStorage.getItem('candidate_profile') || '';
+        if (profStr) {
+            const prof = JSON.parse(profStr);
+            const confStr = prof && prof.personality && prof.personality.confidence;
+            const verbStr = prof && prof.personality && prof.personality.verbosity;
+            if (confidenceSelect && typeof confStr === 'string') confidenceSelect.value = confStr;
+            if (verbositySelect && typeof verbStr === 'string') verbositySelect.value = verbStr;
+        }
+    } catch (_) {}
+    // Initialize skill sliders from profile
+    loadSkillMatrixFromCandidateProfile();
+    if (reloadSkillMatrixBtn) reloadSkillMatrixBtn.addEventListener('click', (e) => { e.preventDefault(); loadSkillMatrixFromCandidateProfile(); });
     if (autoGenerateBtn) autoGenerateBtn.addEventListener('click', (e) => {
         e.preventDefault();
         requestAutoAnswer();
     });
-    updateSliderLabels();
+    // No slider labels to update anymore
 
     if (statusSpinner) statusSpinner.classList.remove('d-none');
     if (statusText) statusText.textContent = 'Connecting...';

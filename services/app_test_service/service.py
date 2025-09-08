@@ -123,6 +123,11 @@ async def generate_auto_answer_for_session(
     correctness_level: float,
     confidence_level: float,
     *,
+    # New optional controls
+    confidence: Optional[str] = None,
+    verbosity: Optional[str] = None,
+    skill_matrix: Optional[Any] = None,
+    # Context
     job_description: Optional[str] = None,
     candidate_resume: Optional[str] = None,
     candidate_profile: Optional[str] = None,
@@ -136,9 +141,15 @@ async def generate_auto_answer_for_session(
     session_id: str
         The interview session identifier (used to pull history and last question).
     correctness_level: float
-        Desired technical correctness level [0.0, 1.0].
+        Desired technical correctness level [0.0, 1.0]. (legacy)
     confidence_level: float
-        Desired confidence/hedging in tone [0.0, 1.0].
+        Desired confidence/hedging in tone [0.0, 1.0]. (legacy)
+    confidence: Optional[str]
+        One of {'High','Medium','Low'} to control tone. Overrides numeric if provided.
+    verbosity: Optional[str]
+        One of {'Concise','Balanced','Verbose'} to control verbosity.
+    skill_matrix: Optional[Any]
+        A JSON-serializable list or string describing the candidate's skill matrix.
     job_description: Optional[str]
         Full job description text (optional; falls back to blueprint evidence).
     candidate_resume: Optional[str]
@@ -150,7 +161,7 @@ async def generate_auto_answer_for_session(
     job_id: Optional[int]
         Job posting identifier to link with session for analytics.
     """
-    # Clamp the levels to [0, 1]
+    # Clamp the legacy levels to [0, 1]
     try:
         c_lvl = max(0.0, min(1.0, float(correctness_level)))
     except Exception:
@@ -205,19 +216,27 @@ async def generate_auto_answer_for_session(
     if not rez_text and resume_points:
         rez_text = "\n".join(f"- {p}" for p in resume_points[:12])
 
-    # System prompt: role-play constraints and levels
+    # System prompt: role-play constraints with new controls if provided
+    tone_lines: List[str] = [
+        "Behaviors (use these without stating them):",
+    ]
+    if confidence:
+        tone_lines.append(f"- Confidence: {confidence}.")
+    else:
+        tone_lines.append(f"- Confidence Level (0-1): {conf_lvl:.2f}.")
+    if verbosity:
+        tone_lines.append(f"- Verbosity: {verbosity}.")
+    tone_lines.append(f"- Technical Correctness Level (0-1): {c_lvl:.2f}.")
+
     system_prompt = (
         "You are role-playing as a job candidate in a technical interview.\n"
         "Your goal is to answer the interviewer's latest question as the candidate would.\n\n"
-        "Behaviors (use these levels without mentioning them):\n"
-        f"- Technical Correctness Level (0-1): {c_lvl:.2f}.\n"
-        f"- Confidence Level (0-1): {conf_lvl:.2f}.\n\n"
+        + "\n".join(tone_lines) + "\n\n"
         "Guidance:\n"
         "- Higher correctness => more accurate, grounded, and technically precise content.\n"
-        "- Lower correctness => introduce typical mistakes or gaps plausibly, not nonsense.\n"
-        "- Higher confidence => assertive tone, fewer hedges.\n"
-        "- Lower confidence => hedging, uncertainty markers, cautious tone.\n"
-        "- Keep the answer concise (2-6 sentences).\n"
+        "- Lower correctness => introduce typical mistakes or gaps plausibly, never gibberish.\n"
+        "- If confidence is Low, use cautious tone and hedges; if High, be assertive.\n"
+        "- If verbosity is Concise, keep to 2-3 sentences; Balanced: 3-5; Verbose: 5-7.\n"
         "- Do NOT reveal or mention any numeric levels.\n\n"
         "Respond ONLY with a single, valid JSON object containing an 'answer_text' field."
     )
@@ -229,6 +248,13 @@ async def generate_auto_answer_for_session(
         parts.append(f"Candidate Resume (context):\n{rez_text}")
     if candidate_profile:
         parts.append(f"Candidate Profile (context):\n{candidate_profile}")
+    # Add skill matrix override explicitly if provided
+    if skill_matrix is not None:
+        try:
+            sm_text = json.dumps(skill_matrix)
+        except Exception:
+            sm_text = str(skill_matrix)
+        parts.append(f"Skill Matrix (override):\n{sm_text}")
     if jd_text:
         parts.append(f"Job Description / Responsibilities (context):\n{jd_text}")
     if history_text:

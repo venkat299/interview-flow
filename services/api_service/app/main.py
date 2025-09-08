@@ -125,14 +125,18 @@ async def generate_candidate(job_id: int):
 async def auto_answer(session_id: str, payload: dict):
     """Generate a candidate-style answer to the latest question for the session.
 
-    Body JSON:
-    - correctness_level: float in [0,1]
-    - confidence_level: float in [0,1]
+    Body JSON (new preferred):
+    - confidence: optional str in {'High','Medium','Low'}
+    - verbosity: optional str in {'Concise','Balanced','Verbose'}
+    - skill_matrix: optional JSON (array or string)
     - job_description: optional str
     - candidate_resume: optional str
     - candidate_profile: optional str
     - candidate_id: optional str
     - job_id: optional int
+    Backwards compatible:
+    - correctness_level: float in [0,1]
+    - confidence_level: float in [0,1]
     Returns: {"answer_text": str}
     """
     try:
@@ -140,6 +144,9 @@ async def auto_answer(session_id: str, payload: dict):
             session_id,
             float(payload.get("correctness_level", 0.8)),
             float(payload.get("confidence_level", 0.7)),
+            confidence=payload.get("confidence"),
+            verbosity=payload.get("verbosity"),
+            skill_matrix=payload.get("skill_matrix"),
             job_description=payload.get("job_description"),
             candidate_resume=payload.get("candidate_resume"),
             candidate_profile=payload.get("candidate_profile"),
