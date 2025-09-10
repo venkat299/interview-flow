@@ -12,6 +12,7 @@ function initChat() {
     const wordCounterEl = document.getElementById('word-counter');
     const turnTimerEl = document.getElementById('turn-timer');
     const stageBadge = document.getElementById('stage-badge');
+    const contextPre = document.getElementById('context-packet');
     // Auto-answer controls
     const autoToggle = document.getElementById('auto-toggle');
     const autoControls = document.getElementById('auto-controls');
@@ -41,6 +42,15 @@ function initChat() {
     let totalWords = 0;
     let lastQuestionText = '';
     let skillMatrixState = [];
+
+    function renderContextPacket(ctx) {
+        if (!contextPre) return;
+        try {
+            contextPre.textContent = JSON.stringify(ctx || {}, null, 2);
+        } catch (_) {
+            contextPre.textContent = '(failed to render context)';
+        }
+    }
 
     function updateCandidateProfileContext() {
         try {
@@ -284,6 +294,9 @@ function initChat() {
                     updateStageBadge(stg);
                     addLog(`Stage changed to ${prettyStageName(stg)}`);
                 }
+                return;
+            } else if (event === 'context_packet') {
+                renderContextPacket(payload || {});
                 return;
             }
             if (event === 'new_question') {

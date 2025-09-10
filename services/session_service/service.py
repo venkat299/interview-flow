@@ -82,6 +82,11 @@ class ConnectionManager:
                 await websocket.send_json({"event": "stage_changed", "payload": {"stage": state.current_phase}})
             except Exception:
                 pass
+            # Emit initial ContextPacket for UI
+            try:
+                await websocket.send_json({"event": "context_packet", "payload": packet.model_dump()})
+            except Exception:
+                pass
             try:
                 # A compact blueprint for the UI (topics inferred from overlap or JD skills)
                 topics = (packet.overlap_skills or packet.jd_core_skills or [])
@@ -103,6 +108,11 @@ class ConnectionManager:
                 try:
                     if state.current_phase != prev_stage:
                         await websocket.send_json({"event": "stage_changed", "payload": {"stage": state.current_phase}})
+                except Exception:
+                    pass
+                # Emit updated ContextPacket after orchestration step
+                try:
+                    await websocket.send_json({"event": "context_packet", "payload": state.packet.model_dump()})
                 except Exception:
                     pass
                 # Persist interviewer question so auto-answer can find it
@@ -146,6 +156,11 @@ class ConnectionManager:
                         await websocket.send_json({"event": "stage_changed", "payload": {"stage": "wrap_up"}})
                 except Exception:
                     pass
+                # Final ContextPacket emission before closing
+                try:
+                    await websocket.send_json({"event": "context_packet", "payload": state.packet.model_dump()})
+                except Exception:
+                    pass
                 await websocket.send_json({"event": "interview_ended"})
                 await websocket.close()
                 self.disconnect(websocket)
@@ -155,6 +170,11 @@ class ConnectionManager:
             try:
                 if state.current_phase != prev_stage:
                     await websocket.send_json({"event": "stage_changed", "payload": {"stage": state.current_phase}})
+            except Exception:
+                pass
+            # Emit updated ContextPacket after this answer handling
+            try:
+                await websocket.send_json({"event": "context_packet", "payload": state.packet.model_dump()})
             except Exception:
                 pass
             # Persist the next interviewer question

@@ -1,4 +1,28 @@
 import os
+from pathlib import Path
+from typing import Any, Dict
+
+import yaml
+
+
+def _load_router_config() -> Dict[str, Any]:
+    """Load llm_router_config.yml next to this module.
+
+    Returns an empty dict if the file is missing or invalid.
+    """
+    try:
+        cfg_path = Path(__file__).with_name("llm_router_config.yml")
+        with cfg_path.open("r", encoding="utf-8") as fh:
+            return yaml.safe_load(fh) or {}
+    except Exception:
+        return {}
+
+
+_ROUTER_CFG: Dict[str, Any] = _load_router_config()
+_PROVIDERS: Dict[str, Any] = _ROUTER_CFG.get("providers", {}) if isinstance(_ROUTER_CFG, dict) else {}
+_LOCAL_PROVIDER: Dict[str, Any] = _PROVIDERS.get("local", {}) if isinstance(_PROVIDERS, dict) else {}
+_LOCAL_BASE_URL_YAML: str = (_LOCAL_PROVIDER.get("base_url") or "") if isinstance(_LOCAL_PROVIDER, dict) else ""
+_LOCAL_MODEL_YAML: str = (_LOCAL_PROVIDER.get("model") or "openai/gpt-oss-20b") if isinstance(_LOCAL_PROVIDER, dict) else "openai/gpt-oss-20b"
 
 
 class Settings:
@@ -13,11 +37,11 @@ class Settings:
     openai_model: str = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
 
     # Model identifier for local OpenAI-compatible servers
-    local_model: str = os.getenv("LOCAL_LLM_MODEL", "openai/gpt-oss-20b")
+    # Prefer llm_router_config.yml, allow env override
+    local_model: str = os.getenv("LOCAL_LLM_MODEL", _LOCAL_MODEL_YAML)
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
-    local_llm_url: str = os.getenv(
-        "LOCAL_LLM_URL", "https://5c7acf053e0f.ngrok-free.app/v1/chat/completions"
-    )
+    # Local OpenAI-compatible server URL; prefer llm_router_config.yml, allow env override
+    local_llm_url: str = os.getenv("LOCAL_LLM_URL", _LOCAL_BASE_URL_YAML)
 
     # --- Logging / Tracing configuration ---
     # Standard log level: DEBUG, INFO, WARNING, ERROR, CRITICAL, or TRACE (custom)
