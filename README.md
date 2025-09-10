@@ -12,13 +12,14 @@ The platform is built on a modern, scalable backend using a **microservices arch
 * **Orchestrator**: A central decision layer that owns pacing, logging and agenda coverage. It pulls in helper services to pick questions, score answers and store results.
 * **Helper Services**: Modular packages in `services/` provide distinct responsibilities:
   * `interviewer_service` – phrasing questions and follow-ups.
-  * `monitor_service` – shadow evaluation, guardrails and timing nudges.
-  * `scoring_service` – aggregates test results and rubric ratings into final scores.
-  * `question_service` – seed bank management and on-the-fly generation.
-  * `sandbox_service` – code and SQL execution sandboxes.
-  * `verification_service` – resume-claim probing utilities.
-  * `analytics_service`, `guardrails_service`, `adaptivity_service`, and `evidence_service` supply metrics, safety filters, ability models and resume parsing.
-* **Real-Time Interaction**: The orchestration service exposes **WebSocket** endpoints to run live interviews and persists transcripts in SQLite via `storage_service`.
+  * `monitor_service` – shadow evaluation and timing nudges.
+  * `scoring_service` – aggregates turn signals into final scores.
+  * `gateway_service` – routes prompts to the configured LLM provider.
+  * `orchestrator_service` – stage logic and LLM prompt helpers.
+  * `session_service` – WebSocket flow plus lightweight session persistence.
+  * `sample_data_service` – SQLite-backed seed data and resume storage.
+  * `app_test_service` – utilities to generate fake candidates and auto-answers.
+* **Real-Time Interaction**: The orchestration service exposes **WebSocket** endpoints to run live interviews and persists transcripts in SQLite via `session_service.database`.
 * **Development & Deployment**: All services are bundled into a single container using **Docker**. The image copies the entire repository and sets `PYTHONPATH=/code/services` so each module can be imported. Local development is driven with **Docker Compose**, ensuring a consistent and reproducible environment.
 
 ## 3. Local Development
