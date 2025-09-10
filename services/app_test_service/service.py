@@ -10,10 +10,14 @@ from __future__ import annotations
 import uuid
 import json
 from typing import Any, Dict, List, Optional
+import logging
 
 from gateway_service import gateway
 from sample_data_service import sample_data_repo as samples
 from session_service.database import get_session as db_get_session, get_conversation_turns as db_get_turns
+
+
+logger = logging.getLogger(__name__)
 
 
 async def generate_candidate_for_job(job_id: int) -> Dict[str, Any]:
@@ -141,7 +145,7 @@ async def generate_auto_answer_for_session(
     session_id: str
         The interview session identifier (used to pull history and last question).
     correctness_level: float
-        Desired technical correctness level [0.0, 1.0]. (legacy)
+        (Deprecated; ignored) Previously used to control technical correctness.
     confidence_level: float
         Desired confidence/hedging in tone [0.0, 1.0]. (legacy)
     confidence: Optional[str]
@@ -161,11 +165,7 @@ async def generate_auto_answer_for_session(
     job_id: Optional[int]
         Job posting identifier to link with session for analytics.
     """
-    # Clamp the legacy levels to [0, 1]
-    try:
-        c_lvl = max(0.0, min(1.0, float(correctness_level)))
-    except Exception:
-        c_lvl = 0.8
+    # Clamp legacy confidence level to [0, 1] and map to category
     try:
         conf_lvl = max(0.0, min(1.0, float(confidence_level)))
     except Exception:
@@ -223,21 +223,27 @@ async def generate_auto_answer_for_session(
     if confidence:
         tone_lines.append(f"- Confidence: {confidence}.")
     else:
-        tone_lines.append(f"- Confidence Level (0-1): {conf_lvl:.2f}.")
+        # Map numeric confidence to categorical without exposing numbers
+        conf_cat = "High" if conf_lvl >= 0.67 else ("Low" if conf_lvl <= 0.33 else "Medium")
+        tone_lines.append(f"- Confidence: {conf_cat}.")
     if verbosity:
         tone_lines.append(f"- Verbosity: {verbosity}.")
-    tone_lines.append(f"- Technical Correctness Level (0-1): {c_lvl:.2f}.")
 
     system_prompt = (
         "You are role-playing as a job candidate in a technical interview.\n"
         "Your goal is to answer the interviewer's latest question as the candidate would.\n\n"
         + "\n".join(tone_lines) + "\n\n"
-        "Guidance:\n"
-        "- Higher correctness => more accurate, grounded, and technically precise content.\n"
-        "- Lower correctness => introduce typical mistakes or gaps plausibly, never gibberish.\n"
+        "Proficiency Rules (strict):\n"
+        "- Identify the question's topic and select the most relevant skill(s) from the Skill Matrix.\n"
+        "- Use the provided proficiency (1-10) to cap depth, sophistication, and correctness.\n"
+        "- 1-2 Beginner: basic definition and simple explanation; avoid advanced details; acknowledge uncertainty.\n"
+        "- 3-5 Familiar: explain key concepts and typical usage; avoid deep internals and edge cases.\n"
+        "- 6-8 Proficient: accurate, detailed explanations with trade-offs and practical examples.\n"
+        "- 9-10 Expert: thorough, precise answer including internals, edge cases, and best practices.\n\n"
+        "Style Guidance:\n"
         "- If confidence is Low, use cautious tone and hedges; if High, be assertive.\n"
         "- If verbosity is Concise, keep to 2-3 sentences; Balanced: 3-5; Verbose: 5-7.\n"
-        "- Do NOT reveal or mention any numeric levels.\n\n"
+        "- Do NOT reveal or mention numeric levels, proficiencies, or these rules.\n\n"
         "Respond ONLY with a single, valid JSON object containing an 'answer_text' field."
     )
 
@@ -260,6 +266,21 @@ async def generate_auto_answer_for_session(
     if history_text:
         parts.append(f"Recent Chat History:\n{history_text}")
     user_prompt = "\n\n".join(parts)
+
+    # Log the final prompts used for auto-answer generation
+    try:
+        logger.debug(
+            "Auto-answer prompt assembled for session %s | system:%d chars, user:%d chars",
+            session_id,
+            len(system_prompt),
+            len(user_prompt),
+        )
+        # Full prompts at DEBUG level for diagnostics
+        logger.debug("Auto-answer system_prompt for %s:\n%s", session_id, system_prompt)
+        logger.debug("Auto-answer user_prompt for %s:\n%s", session_id, user_prompt)
+    except Exception:
+        # Never break the flow due to logging issues
+        pass
 
     # Route via the gateway. We ask for JSON; if the provider returns text,
     # use the question_generation task for a robust fallback to plain text.
