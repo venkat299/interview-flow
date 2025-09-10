@@ -21,32 +21,13 @@ def test_report_endpoint(monkeypatch, tmp_path: Path, client):
     tmp_db = tmp_path / "sessions.db"
     db.init_db(tmp_db)
     session_id = "sess-test"
-    blueprint = {
-        "topics": [
-            {
-                "name": "python",
-                "relevance_to_role": 10,
-                "required_depth": "Advanced",
-                "jd_context": ["python"],
-                "resume_evidence": ["python exp"],
-            }
-        ]
-    }
-    db.create_session(session_id, blueprint, db_path=tmp_db)
-    eval_data = {
-        "score": 8,
-        "assessed_depth": "Advanced",
-        "llm_confidence": "High",
-        "justification": "Good",
-        "is_truthful": True,
-        "topic": "python",
-        "difficulty": 3,
-    }
+    db.create_session(session_id, {}, db_path=tmp_db)
     db.log_turn(session_id, "interviewer", "What is Python?", db_path=tmp_db)
-    db.log_turn(session_id, "candidate", "A language", eval_data, db_path=tmp_db)
+    db.log_turn(session_id, "candidate", "A language", None, db_path=tmp_db)
+    rubric = {"scores": {"depth": 2, "tradeoffs": 2, "fundamentals": 3, "clarity": 1, "total": 8}}
     db.end_session(
         session_id,
-        rubric={"performance_log": [eval_data]},
+        rubric=rubric,
         transcript=[{"role": "interviewer", "message": "What is Python?"}, {"role": "candidate", "message": "A language"}],
         final_score=8.0,
         summary="Great",

@@ -16,7 +16,7 @@ class Settings:
     local_model: str = os.getenv("LOCAL_LLM_MODEL", "openai/gpt-oss-20b")
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
     local_llm_url: str = os.getenv(
-        "LOCAL_LLM_URL", "https://8cb5852bd7fb.ngrok-free.app/v1/chat/completions"
+        "LOCAL_LLM_URL", "https://5c7acf053e0f.ngrok-free.app/v1/chat/completions"
     )
 
     # --- Logging / Tracing configuration ---

@@ -1,89 +1,42 @@
 import sys
-import sys
-import sys
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 import pytest
 
+from orchestrator_service import llm_api as ai
+from orchestrator_service.schemas import ContextPacket
 from session_service.interview_state import InterviewState
-from session_service.service import ConnectionManager
 
 
 @pytest.mark.asyncio
-async def test_topic_progression(monkeypatch):
-    blueprint = {"topics": [
-        {"name": "python", "relevance_to_role": 10},
-        {"name": "databases", "relevance_to_role": 8},
-    ]}
-    state = InterviewState(blueprint)
+async def test_context_packet_creation(monkeypatch):
+    async def fake_execute(task_name, system_prompt, user_prompt=None):
+        assert task_name == "stage_0_analysis"
+        return {
+            "role_from_jd": "backend",
+            "jd_core_skills": ["python"],
+            "resume_claims": ["python"],
+            "overlap_skills": ["python"],
+            "primary_overlap_focus": "python",
+        }
 
-    first = state.get_next_topic()
-    assert first["name"] == "python"
-    state.update_state_after_answer({"score": 8})
+    monkeypatch.setattr(ai.gateway, "execute_task", fake_execute)
 
-    second = state.get_next_topic()
-    assert second["name"] == "databases"
-    state.update_state_after_answer({"score": 8})
-
-    third = state.get_next_topic()
-    assert third["name"] == "python"
-    assert state.topic_progress["python"] == 2
-
-
-@pytest.mark.asyncio
-async def test_next_question_has_feedback(monkeypatch):
-    async def fake_generate(request):
-        return "What is Python?"
-
-    monkeypatch.setattr(
-        "session_service.service.generate_next_question",
-        fake_generate,
-    )
-    # Force deterministic feedback
-    monkeypatch.setattr(
-        "session_service.service.random.choice",
-        lambda opts: "Great, let's move on.",
-    )
-
-    mgr = ConnectionManager()
-    websocket = object()
-    mgr.contexts[websocket] = {"job_description": ""}
-    mgr.persona[websocket] = "friendly_mentor"
-    state = InterviewState({"topics": [{"name": "python", "relevance_to_role": 10}]})
-    state.current_phase = "technical"
-    state.current_topic = state.get_next_topic()
-    mgr.states[websocket] = state
-
-    question = await mgr._next_question(websocket, [])
-    assert question.startswith("Great, let's move on.")
+    packet = await ai.analyze_jd_resume("JD", "Resume")
+    assert isinstance(packet, ContextPacket)
+    assert packet.role_from_jd == "backend"
+    assert packet.time_remaining_min == packet.duration_min
 
 
-@pytest.mark.asyncio
-async def test_lower_difficulty_after_poor_answer():
-    blueprint = {"topics": [{"name": "python", "relevance_to_role": 10}]}
-    state = InterviewState(blueprint)
-    state.get_next_topic()
-    state.switch_after = 99
-    state.update_state_after_answer({"score": 8})
-    assert state.topic_progress["python"] == 2
-    state.update_state_after_answer({"score": 2})
-    assert state.topic_progress["python"] == 1
+def test_stage_progression_and_time():
+    packet = ContextPacket(jd_text="", resume_text="", duration_min=10)
+    packet.time_remaining_min = 10
+    state = InterviewState(packet)
+    assert state.current_phase == "warm_up"
+    state.advance_phase()
+    assert state.current_phase == "evidence"
+    state.decrement_time(3)
+    assert state.packet.time_remaining_min == 7
 
-
-@pytest.mark.asyncio
-async def test_switch_topic_after_threshold():
-    blueprint = {"topics": [
-        {"name": "python", "relevance_to_role": 10},
-        {"name": "databases", "relevance_to_role": 8},
-    ]}
-    state = InterviewState(blueprint)
-    state.get_next_topic()
-    state.switch_after = 2
-    state.update_state_after_answer({"score": 8})
-    assert not state.should_switch_topic()
-    state.update_state_after_answer({"score": 8})
-    assert state.should_switch_topic()
-    state.get_next_topic()
-    assert state.current_topic["name"] == "databases"

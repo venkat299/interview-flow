@@ -1,6 +1,5 @@
 """Utilities for generating interview PDF reports."""
 from typing import Dict, List
-from statistics import mean
 
 from fpdf import FPDF
 
@@ -14,50 +13,6 @@ TEXT = (34, 34, 34)
 MUTED = (100, 100, 100)
 RULE = (230, 230, 230)
 SOFT_ACCENT_BG = (243, 248, 255)
-
-CONFIDENCE_MAP = {"Low": 1, "Medium": 2, "High": 3}
-
-
-def _unique(items: List[str], limit: int = 5) -> List[str]:
-    """Return up to ``limit`` unique items preserving order."""
-    seen: List[str] = []
-    for item in items:
-        if item and item not in seen:
-            seen.append(item)
-        if len(seen) >= limit:
-            break
-    return seen
-
-
-def _topic_stats(performance_log: List[Dict]) -> Dict[str, Dict[str, float]]:
-    """Aggregate scores, confidence and difficulty per topic."""
-    stats: Dict[str, Dict[str, List]] = {}
-    for entry in performance_log or []:
-        topic = entry.get("topic", "General")
-        bucket = stats.setdefault(topic, {"scores": [], "conf": [], "max_correct": 0})
-        bucket["scores"].append(entry.get("score", 0))
-        bucket["conf"].append(CONFIDENCE_MAP.get(entry.get("llm_confidence", "Low"), 1))
-        if entry.get("score", 0) >= 7:
-            diff = entry.get("difficulty", 0)
-            if diff > bucket["max_correct"]:
-                bucket["max_correct"] = diff
-    results: Dict[str, Dict[str, float]] = {}
-    for topic, data in stats.items():
-        avg_score = mean(data["scores"]) if data["scores"] else 0
-        avg_conf_num = mean(data["conf"]) if data["conf"] else 0
-        if avg_conf_num >= 2.5:
-            avg_conf = "High"
-        elif avg_conf_num >= 1.5:
-            avg_conf = "Medium"
-        else:
-            avg_conf = "Low"
-        results[topic] = {
-            "avg_score": avg_score,
-            "avg_confidence": avg_conf,
-            "max_correct": data["max_correct"],
-        }
-    return results
-
 
 def _epw(pdf: FPDF) -> float:
     """Effective page width (page width minus left/right margins)."""
@@ -166,112 +121,6 @@ def _bullet_list(pdf: FPDF, items: List[str]) -> None:
     pdf.set_text_color(*TEXT)
 
 
-def _topic_table(pdf: FPDF, topic_stats: Dict[str, Dict[str, float]]) -> None:
-    w = _epw(pdf)
-    col_w = [w * 0.46, w * 0.18, w * 0.2, w * 0.16]
-    # Header row
-    pdf.set_x(pdf.l_margin)
-    pdf.set_fill_color(240, 245, 255)
-    pdf.set_text_color(60, 60, 60)
-    pdf.set_font(pdf._font_bold, "B", 11)
-    headers = ["Topic", "Avg Score", "Confidence", "Max Diff"]
-    aligns = ["L", "C", "C", "C"]
-    # Header uses wrapped cells too (rarely needed, but safe)
-    _table_row(pdf, col_w, headers, aligns=aligns, header=True)
-    pdf.ln(1)
-    pdf.set_text_color(*TEXT)
-    pdf.set_font(pdf._font_regular, "", 11)
-    pdf.set_draw_color(*RULE)
-    # Rows
-    for topic, data in topic_stats.items():
-        pdf.set_x(pdf.l_margin)
-        cells = [
-            topic,
-            f"{data['avg_score']:.1f}/10",
-            data["avg_confidence"],
-            str(data["max_correct"]),
-        ]
-        _table_row(pdf, col_w, cells, aligns=aligns)
-
-def _split_lines(pdf: FPDF, text: str, width: float, line_h: float) -> int:
-    try:
-        lines = pdf.multi_cell(width, line_h, text, split_only=True)
-        return len(lines) if isinstance(lines, (list, tuple)) else 1
-    except TypeError:
-        # Fallback if split_only not supported: crude estimate by width
-        words = (text or "").split()
-        if not words:
-            return 1
-        count = 1
-        cur_w = 0.0
-        for wtxt in words:
-            ww = pdf.get_string_width((wtxt + " "))
-            if cur_w + ww <= width:
-                cur_w += ww
-            else:
-                count += 1
-                cur_w = ww
-        return max(1, count)
-
-
-def _table_row(
-    pdf: FPDF,
-    col_w: List[float],
-    texts: List[str],
-    aligns: List[str] | None = None,
-    line_h: float = 6,
-    header: bool = False,
-) -> None:
-    if aligns is None:
-        aligns = ["L"] * len(texts)
-    x0, y0 = pdf.get_x(), pdf.get_y()
-    # Determine row height based on wrapped lines in each cell
-    max_lines = 1
-    for i, txt in enumerate(texts):
-        width = col_w[i]
-        n_lines = _split_lines(pdf, txt, width, line_h)
-        if n_lines > max_lines:
-            max_lines = n_lines
-    row_h = max_lines * line_h
-    # If the row won't fit on the current page, start a new page
-    if pdf.get_y() + row_h > (pdf.h - pdf.b_margin):
-        pdf.add_page()
-        x0, y0 = pdf.get_x(), pdf.get_y()
-    # Render each cell with wrapping; keep cursor on the same row
-    pdf.set_x(pdf.l_margin)
-    for i, txt in enumerate(texts):
-        width = col_w[i]
-        # Background for header
-        if header:
-            pdf.set_fill_color(240, 245, 255)
-            fill = True
-            pdf.set_text_color(60, 60, 60)
-            pdf.set_font(pdf._font_bold, "B", 11)
-        else:
-            fill = False
-            pdf.set_text_color(*TEXT)
-            pdf.set_font(pdf._font_regular, "", 11)
-        # Draw the text
-        pdf.multi_cell(
-            width,
-            line_h,
-            txt or "",
-            border=0,
-            align=aligns[i] if i < len(aligns) else "L",
-            fill=fill,
-            new_x="RIGHT",
-            new_y="TOP",
-        )
-        # After writing, we're at top-right of the cell; move to next cell position automatically
-    # Draw bottom border across the whole row (single rule)
-    pdf.set_draw_color(*RULE)
-    pdf.set_line_width(0.2)
-    pdf.set_xy(x0, y0 + row_h)
-    pdf.line(pdf.l_margin, pdf.get_y(), pdf.l_margin + sum(col_w), pdf.get_y())
-    # Move to next line by the row height
-    pdf.ln(row_h)
-
-
 def _meta_block(pdf: FPDF, pairs: List[tuple[str, str]]) -> None:
     """Render simple key/value metadata in two columns."""
     w = _epw(pdf)
@@ -300,11 +149,7 @@ def generate_report_pdf(session: Dict, turns: List[Dict]) -> bytes:
     """Create a PDF report for a finished interview session."""
     blueprint = session.get("blueprint") or {}
     rubric = session.get("rubric") or {}
-    performance_log = rubric.get("performance_log") or []
-
-    topic_stats = _topic_stats(performance_log)
-    job_points = _unique([p for t in blueprint.get("topics", []) for p in t.get("jd_context", [])])
-    resume_points = _unique([p for t in blueprint.get("topics", []) for p in t.get("resume_evidence", [])])
+    scores = rubric.get("scores") or {}
 
     # Styled PDF with header/footer
     pdf = ReportPDF()
@@ -328,8 +173,18 @@ def generate_report_pdf(session: Dict, turns: List[Dict]) -> bytes:
 
     pdf.set_text_color(*TEXT)
     pdf.set_font(pdf._font_regular, "", 12)
-    score = session.get("final_score")
-    _score_card(pdf, score)
+    total_score = scores.get("total", session.get("final_score"))
+    _score_card(pdf, total_score)
+    if scores:
+        _section_title(pdf, "Score Breakdown")
+        items = [
+            f"Depth of reasoning: {scores.get('depth', 0)}/3",
+            f"Trade-off analysis: {scores.get('tradeoffs', 0)}/3",
+            f"Fundamentals verified: {scores.get('fundamentals', 0)}/3",
+            f"Clarity & precision: {scores.get('clarity', 0)}/1",
+        ]
+        _bullet_list(pdf, items)
+        pdf.ln(2)
     # Metadata block for quick context
     meta_pairs = []
     exp_level = (blueprint.get("experience_level") or "-") if isinstance(blueprint, dict) else "-"
@@ -348,29 +203,6 @@ def generate_report_pdf(session: Dict, turns: List[Dict]) -> bytes:
         pdf.set_font(pdf._font_regular, "", 11)
         pdf.multi_cell(_epw(pdf), 7, summary)
         pdf.ln(2)
-
-    _section_title(pdf, "Topic Results")
-    if topic_stats:
-        _topic_table(pdf, topic_stats)
-    else:
-        pdf.set_text_color(*MUTED)
-        pdf.cell(0, 6, "No topic evaluations recorded.", ln=1)
-    pdf.ln(2)
-
-    _section_title(pdf, "Job Description Highlights")
-    if job_points:
-        _bullet_list(pdf, job_points)
-    else:
-        pdf.set_text_color(*MUTED)
-        pdf.cell(0, 6, "No job description highlights available.", ln=1)
-    pdf.ln(2)
-
-    _section_title(pdf, "Resume Highlights")
-    if resume_points:
-        _bullet_list(pdf, resume_points)
-    else:
-        pdf.set_text_color(*MUTED)
-        pdf.cell(0, 6, "No resume highlights available.", ln=1)
 
     pdf.add_page()
     _section_title(pdf, "Chat Transcript")

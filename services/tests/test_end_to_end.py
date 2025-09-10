@@ -1,105 +1,64 @@
 import sys
 from pathlib import Path
-import types
 
-sys.path.append(str(Path(__file__).resolve().parents[2]))
+sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 import pytest
 
-from orchestrator_service import Orchestrator
-import orchestrator_service.orchestrator as orchestrator_module
-from question_service import question_bank
-from interviewer_service import LLMInterviewer
-from monitor_service import LLMMonitor
-from scoring_service import ScoringEngine
-from adaptivity_service import AbilityModel
-from sandbox_service.code_runner import run_code
-from sandbox_service.sql_runner import run_query
-from evidence_service import resume_parser, artifact_ingest
-from guardrails_service import filters
-from analytics_service import item_metrics
-from verification_service import prober
-from storage_service import storage
-from ai_orchestration_service import ai_orchestration as ai
+from orchestrator_service import llm_api as ai
+from orchestrator_service.orchestrator import Orchestrator
+from session_service.interview_state import InterviewState
 
 
 @pytest.mark.asyncio
-async def test_end_to_end_flow(monkeypatch):
-    """Exercise the full interview flow across all services."""
-    async def fake_intro():
-        return "Welcome! Please introduce yourself."
+async def test_stage_flow(monkeypatch):
+    async def fake_execute(task_name, system_prompt, user_prompt=None):
+        mapping = {
+            "stage_0_analysis": {
+                "role_from_jd": "backend",
+                "jd_core_skills": ["python"],
+                "resume_claims": ["python"],
+                "overlap_skills": ["python"],
+                "primary_overlap_focus": "python",
+            },
+            "stage_1_parse": {
+                "goal": "demo",
+                "constraints": ["latency"],
+                "scale_latency_slo": "100rps",
+            },
+            "stage_2_parse": {
+                "skill_hooks": ["python"],
+                "confidence_ratings": {"python": 5},
+                "notes": ["api work"],
+            },
+            "stage_3_question": {"question_text": "What is Python?"},
+            "stage_3_eval": {"result": "pass", "rationale": "ok"},
+            "stage_4_summary": {"strengths": ["reasoning"], "risks": [], "follow_ups": []},
+        }
+        return mapping[task_name]
 
-    async def fake_soft(resume: str):
-        return "Describe a challenge you overcame."
+    monkeypatch.setattr(ai.gateway, "execute_task", fake_execute)
 
-    monkeypatch.setattr(orchestrator_module, "generate_introductory_question", fake_intro)
-    monkeypatch.setattr(orchestrator_module, "generate_soft_skill_question", fake_soft)
+    packet = await ai.analyze_jd_resume("JD", "Resume")
+    state = InterviewState(packet)
+    orch = Orchestrator()
 
-    orchestrator = Orchestrator()
-    ability = AbilityModel()
-    interviewer = LLMInterviewer()
-    monitor = LLMMonitor()
-    scoring = ScoringEngine()
+    q1 = await orch.loop(state)
+    assert "overview" in q1.lower()
 
-    resume = "Worked with Python and SQL"
-    claims_graph = resume_parser.parse_resume(resume)
-    repo_meta = artifact_ingest.ingest_repo("https://github.com/example/repo")
+    q2 = await orch.loop(state, "Built service")
+    assert "hardest constraint" in q2.lower()
 
-    state = types.SimpleNamespace(
-        current_phase="introduction",
-        difficulty="beginner",
-        resume_claims=[{"tech": "Python"}],
-        current_topic=None,
-    )
-    context = {"job_description": "Backend role", "candidate_resume": resume}
-    history: list[dict] = []
+    q3 = await orch.loop(state, "Latency shaped design")
+    assert "components you directly built" in q3.lower()
 
-    intro = await orchestrator.decide_next_action(
-        state, context, history, persona="friendly", question_func=lambda req: ""
-    )
-    assert "introduce" in intro.lower()
+    q4 = await orch.loop(state, "API using python confidence 5")
+    assert q4 == "What is Python?"
 
-    state.current_phase = "soft_skills"
-    soft = await orchestrator.decide_next_action(
-        state, context, history, persona="friendly", question_func=lambda req: ""
-    )
-    assert "describe" in soft.lower()
+    q5 = await orch.loop(state, "A language")
+    assert q5 == "Any questions about the role, roadmap, or stack?"
 
-    state.current_phase = None
-    state.current_topic = {"name": "algorithms"}
-    state.difficulty = "intermediate"
+    q6 = await orch.loop(state, "No questions")
+    assert q6 is None
+    assert state.packet.time_remaining_min == 0
 
-    async def question_func(req):
-        item = question_bank.pick_item({"items": question_bank.load_items()}, {})
-        return item["stem"]
-
-    question = await orchestrator.decide_next_action(
-        state, context, history, persona="friendly", question_func=question_func
-    )
-    assert await filters.check_question(question)
-    assert await filters.anonymize_logs({"q": question}) == {"q": question}
-
-    hook_payload = await ai.on_question_selected(question, {})
-    paraphrased = hook_payload["question_text"]
-
-    answer = "A hash table stores key value pairs using a hash function"
-    code_result = run_code("python", "print('hi')", [])
-    sql_result = run_query({}, [], "SELECT 1")
-    assert code_result["passed"] and sql_result == []
-
-    scored = await ai.on_answer_scored(paraphrased, answer, {})
-    ability.update("algorithms", {"score": scored["score"]["correctness"]}, 0.1)
-    assert ability.recommend_next()["skill"] == "algorithms"
-
-    await item_metrics.update_stats("q1", 1.0, 1.0)
-    await item_metrics.record_feedback("q1", 0.5)
-
-    claim = await prober.select_claim({"resume_claims": state.resume_claims})
-    probe = await prober.generate_probe(claim)
-    assert "python" in probe.lower()
-
-    storage.save_transcript("session", [{"question": paraphrased, "answer": answer}])
-    storage.save_decision({"final": scored})
-
-    assert "Python" in claims_graph["claims"]
-    assert repo_meta["status"] == "ingested"

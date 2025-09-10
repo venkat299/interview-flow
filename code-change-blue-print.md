@@ -1,5 +1,20 @@
 # Code Change Blueprint: AI Interviewer Alignment
 
+## Stage-Based Interview Flow
+- The interview now runs through distinct stages (0–4) driven by a shared
+  **Context Packet** capturing job description, resume details, skills, and
+  notes.
+- **Stage‑0** analyzes JD and resume to initialize the packet and timer.
+- **Stage‑1** warm-up collects project context via overview and constraint
+  questions.
+- **Stage‑2** gathers evidence, skill hooks, and confidence ratings.
+- **Stage‑3** verifies fundamentals for each hook.
+- **Stage‑4** wraps up with strengths, risks, and follow-ups, consuming
+  any remaining time.
+- Final assessment aggregates **Depth of reasoning**, **Trade-off analysis**,
+  **Fundamentals verified**, and **Clarity & precision** into a 10-point score
+  reflected in the web UI and PDF report.
+
 ## Step 1 – Introduce Orchestrator Service
 - **File**: `services/orchestrator_service/orchestrator.py`
   - `class Orchestrator`

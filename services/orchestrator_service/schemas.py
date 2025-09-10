@@ -1,5 +1,5 @@
 """Pydantic models for the interview module."""
-from typing import List, Optional
+from typing import Dict, List, Optional
 from pydantic import BaseModel, Field
 
 
@@ -68,3 +68,39 @@ class EvaluationResponse(BaseModel):
     llm_confidence: str
     justification: str
     is_truthful: bool
+
+
+class ProjectContext(BaseModel):
+    """Details captured during the warm-up stage about the candidate's project."""
+
+    goal: Optional[str] = None
+    constraints: List[str] = Field(default_factory=list)
+    scale_latency_slo: Optional[str] = None
+
+
+class VerificationResult(BaseModel):
+    """Outcome of a theoretical verification check in Stage-3."""
+
+    skill: str
+    result: str
+    rationale: Optional[str] = None
+
+
+class ContextPacket(BaseModel):
+    """Shared state passed across interview stages."""
+
+    jd_text: str
+    resume_text: str
+    duration_min: int = 18
+    time_remaining_min: Optional[int] = None
+    role_from_jd: Optional[str] = None
+    jd_core_skills: List[str] = Field(default_factory=list)
+    resume_claims: List[str] = Field(default_factory=list)
+    overlap_skills: List[str] = Field(default_factory=list)
+    primary_overlap_focus: Optional[str] = None
+    selected_project: Optional[str] = None
+    project_context: ProjectContext = Field(default_factory=ProjectContext)
+    skill_hooks: List[str] = Field(default_factory=list)
+    confidence_ratings: Dict[str, int] = Field(default_factory=dict)
+    verifications: List[VerificationResult] = Field(default_factory=list)
+    notes: List[str] = Field(default_factory=list)

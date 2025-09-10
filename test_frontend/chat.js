@@ -2,19 +2,16 @@ function initChat() {
     const chatLog = document.getElementById('chat-log');
     const chatInput = document.getElementById('chat-input');
     const sendButton = document.getElementById('send-button');
-    const skipButton = document.getElementById('skip-button');
-    const endButton = document.getElementById('end-button');
     const reportButton = document.getElementById('report-button');
     const statusText = document.getElementById('status-text');
     const statusSpinner = document.getElementById('status-spinner');
     const rubricBody = document.getElementById('rubric-body');
     const logBody = document.getElementById('log-body');
-    const summaryBody = document.getElementById('summary-body');
-    const statsBody = document.getElementById('stats-body');
     const personaSelect = document.getElementById('persona-select');
     const interviewTimerEl = document.getElementById('interview-timer');
     const wordCounterEl = document.getElementById('word-counter');
     const turnTimerEl = document.getElementById('turn-timer');
+    const stageBadge = document.getElementById('stage-badge');
     // Auto-answer controls
     const autoToggle = document.getElementById('auto-toggle');
     const autoControls = document.getElementById('auto-controls');
@@ -35,10 +32,6 @@ function initChat() {
     };
 
     const history = [];
-    let blueprint = null;
-    let currentTopicName = null;
-    const topicStrength = {};
-    const questionStats = {};
     let ws = null;
     let sessionId = null;
     let interviewStart = null;
@@ -145,14 +138,45 @@ function initChat() {
             if (statusText) statusText.textContent = text || 'AI is thinking...';
             chatInput.disabled = true;
             sendButton.disabled = true;
-            if (skipButton) skipButton.disabled = true;
         } else {
             if (statusSpinner) statusSpinner.classList.add('d-none');
             if (statusText) statusText.textContent = 'Connected';
             chatInput.disabled = false;
             sendButton.disabled = false;
-            if (skipButton) skipButton.disabled = false;
             chatInput.focus();
+        }
+    }
+
+    function prettyStageName(stage) {
+        const m = {
+            'warm_up': 'Warm-Up',
+            'evidence': 'Evidence',
+            'theory': 'Theory',
+            'wrap_up': 'Wrap-Up',
+        };
+        return m[stage] || (stage ? String(stage) : '—');
+    }
+
+    function updateStageBadge(stage) {
+        if (!stageBadge) return;
+        const label = prettyStageName(stage);
+        stageBadge.textContent = label;
+        stageBadge.className = 'badge rounded-pill';
+        switch (stage) {
+            case 'warm_up':
+                stageBadge.classList.add('bg-info');
+                break;
+            case 'evidence':
+                stageBadge.classList.add('bg-warning');
+                break;
+            case 'theory':
+                stageBadge.classList.add('bg-primary');
+                break;
+            case 'wrap_up':
+                stageBadge.classList.add('bg-success');
+                break;
+            default:
+                stageBadge.classList.add('bg-secondary');
         }
     }
 
@@ -164,14 +188,19 @@ function initChat() {
         chatLog.scrollTop = chatLog.scrollHeight;
     }
 
-    function updateRubric(data) {
-        if (!rubricBody || !data) return;
+    function updateRubric(scores) {
+        if (!rubricBody || !scores) return;
+        const total = scores.total != null ? scores.total : 'N/A';
+        const depth = scores.depth != null ? scores.depth : 'N/A';
+        const tradeoffs = scores.tradeoffs != null ? scores.tradeoffs : 'N/A';
+        const fundamentals = scores.fundamentals != null ? scores.fundamentals : 'N/A';
+        const clarity = scores.clarity != null ? scores.clarity : 'N/A';
         rubricBody.innerHTML = `
-            <div><strong>Score:</strong> ${data.score}/10</div>
-            <div><strong>Depth:</strong> ${data.assessed_depth}</div>
-            <div><strong>Confidence:</strong> ${data.llm_confidence}</div>
-            <div><strong>Truthful:</strong> ${data.is_truthful ? 'Yes' : 'No'}</div>
-            <div><strong>Justification:</strong> ${data.justification}</div>
+            <div><strong>Total:</strong> ${total}/10</div>
+            <div><strong>Depth of reasoning:</strong> ${depth}/3</div>
+            <div><strong>Trade-off analysis:</strong> ${tradeoffs}/3</div>
+            <div><strong>Fundamentals verified:</strong> ${fundamentals}/3</div>
+            <div><strong>Clarity &amp; precision:</strong> ${clarity}/1</div>
         `;
     }
 
@@ -182,49 +211,6 @@ function initChat() {
         entry.textContent = text;
         logBody.appendChild(entry);
         logBody.scrollTop = logBody.scrollHeight;
-    }
-
-    function updateSummary() {
-        if (!summaryBody) return;
-        const parts = Object.entries(topicStrength).map(([topic, info]) => {
-            const avg = info.count ? info.total / info.count : 0;
-            const pct = Math.min(100, Math.max(0, avg * 10));
-            return `
-                <div class="mb-2">
-                    <div><strong>${topic}</strong> (${avg.toFixed(1)}/10)</div>
-                    <div class="progress">
-                        <div class="progress-bar" role="progressbar" style="width: ${pct}%;"></div>
-                    </div>
-                </div>
-            `;
-        });
-        summaryBody.innerHTML = parts.length ? parts.join('') : '<p class="text-muted mb-0">No topic evaluations yet.</p>';
-    }
-
-    function updateStatsTable() {
-        if (!statsBody) return;
-        const difficulties = [1,2,3,4,5];
-        const rows = Object.entries(questionStats).map(([topic, counts]) => {
-            const cells = difficulties.map(d => `<td>${counts[d] || 0}</td>`).join('');
-            return `<tr><td>${topic}</td>${cells}</tr>`;
-        }).join('');
-        const table = `
-            <table class="table table-sm mb-0">
-                <thead><tr><th>Topic</th>${difficulties.map(d => `<th>D${d}</th>`).join('')}</tr></thead>
-                <tbody>${rows || '<tr><td colspan="6" class="text-muted">No questions yet</td></tr>'}</tbody>
-            </table>
-        `;
-        statsBody.innerHTML = table;
-    }
-
-    function initStatsFromBlueprint(bp) {
-        questionStats["General"] = {1:0,2:0,3:0,4:0,5:0};
-        (bp.topics || []).forEach(t => {
-            questionStats[t.name] = {1:0,2:0,3:0,4:0,5:0};
-            topicStrength[t.name] = { total: 0, count: 0 };
-        });
-        updateStatsTable();
-        updateSummary();
     }
 
     function formatTime(sec) {
@@ -270,10 +256,6 @@ function initChat() {
             const persona = (personaSelect && personaSelect.value) || sessionStorage.getItem('persona') || 'friendly_mentor';
             sessionStorage.setItem('persona', persona);
             const payload = { job_description: context.job_description, candidate_resume: context.candidate_resume, persona };
-            const tl = parseInt(sessionStorage.getItem('time_limit'), 10);
-            const wl = parseInt(sessionStorage.getItem('word_limit'), 10);
-            if (!isNaN(tl)) payload.time_limit = tl;
-            if (!isNaN(wl)) payload.word_limit = wl;
             ws.send(JSON.stringify({ event: 'join_session', payload }));
         };
 
@@ -281,7 +263,6 @@ function initChat() {
             setThinking(false);
             if (statusText) statusText.textContent = 'Disconnected';
             if (sendButton) sendButton.disabled = true;
-            if (endButton) endButton.disabled = true;
         };
 
         ws.onerror = () => {
@@ -294,70 +275,55 @@ function initChat() {
             try { msg = JSON.parse(ev.data); } catch (_) { return; }
             const { event, payload } = msg || {};
             if (event === 'session_started') {
-                if (statusText) statusText.textContent = 'Connected';
-                chatInput.disabled = false;
-                sendButton.disabled = false;
-                if (skipButton) skipButton.disabled = false;
-                if (endButton) endButton.disabled = false;
-                startInterviewTimer();
-            } else if (event === 'blueprint') {
-                blueprint = payload;
-                initStatsFromBlueprint(blueprint);
-                addLog('Interview started');
-                if (payload && Array.isArray(payload.topics)) {
-                    const names = payload.topics.map(t => t.name).join(', ');
-                    addLog(`Topics: ${names}`);
+                // Default initial stage is warm_up
+                updateStageBadge('warm_up');
+                return;
+            } else if (event === 'stage_changed') {
+                const stg = (payload && payload.stage) || '';
+                if (stg) {
+                    updateStageBadge(stg);
+                    addLog(`Stage changed to ${prettyStageName(stg)}`);
                 }
-            } else if (event === 'interviewer_typing') {
-                setThinking(true);
-            } else if (event === 'evaluation') {
-                updateRubric(payload);
-                if (currentTopicName && topicStrength[currentTopicName]) {
-                    if (typeof payload.score === 'number') {
-                        topicStrength[currentTopicName].total += payload.score;
-                        topicStrength[currentTopicName].count += 1;
-                        updateSummary();
-                    }
-                }
-            } else if (event === 'new_question') {
+                return;
+            }
+            if (event === 'new_question') {
                 const q = (payload && payload.question_text) || '';
-                const t = (payload && payload.topic) || 'General';
-                const d = (payload && payload.difficulty) || 3;
-                currentTopicName = t;
+                const stg = (payload && payload.stage) || '';
+                if (stg) updateStageBadge(stg);
+                if (q) {
+                    // Log the question with stage label
+                    addLog(`[${prettyStageName(stg)}] Asked: ${q}`);
+                }
                 if (q) {
                     history.push({ role: 'interviewer', message: q });
                     addMessage('interviewer', q);
-                    addLog(`Asked question on ${t} (difficulty ${d})`);
-                    if (!questionStats[t]) questionStats[t] = {1:0,2:0,3:0,4:0,5:0};
-                    questionStats[t][d] = (questionStats[t][d] || 0) + 1;
-                    updateStatsTable();
+                    if (!interviewStart) startInterviewTimer();
                 }
                 lastQuestionText = q || '';
+                chatInput.disabled = false;
+                sendButton.disabled = false;
+                if (statusText) statusText.textContent = 'Connected';
                 setThinking(false);
                 resetTurnTimer();
-                // Auto-generate answer if toggled on
                 if (autoToggle && autoToggle.checked && lastQuestionText) {
                     requestAutoAnswer();
                 }
             } else if (event === 'interview_ended') {
                 setThinking(false);
+                updateStageBadge('wrap_up');
                 addMessage('interviewer', 'Interview ended. Thank you for your time.');
                 addLog('Interview ended');
                 chatInput.disabled = true;
                 sendButton.disabled = true;
-                if (skipButton) skipButton.disabled = true;
-                if (endButton) endButton.disabled = true;
                 if (reportButton) reportButton.disabled = false;
                 if (statusText) statusText.textContent = 'Interview ended';
                 stopTimers();
                 fetch(`${ORCH_BASE}/api/v1/sessions/${sessionId}`).then(r => r.json()).then(data => {
-                    if (data && rubricBody) {
-                        const score = data.final_score != null ? data.final_score : 'N/A';
-                        const summaryText = data.summary ? `<div class="mt-2">${marked.parse(data.summary)}</div>` : '';
-                        rubricBody.innerHTML = `
-                            <div><strong>Final Score:</strong> ${score}</div>
-                            ${summaryText}
-                        `;
+                    if (data && data.rubric && data.rubric.scores) {
+                        updateRubric(data.rubric.scores);
+                    }
+                    if (data && data.summary && rubricBody) {
+                        rubricBody.innerHTML += `<div class="mt-2">${marked.parse(data.summary)}</div>`;
                     }
                 }).catch(() => {});
             }
@@ -422,37 +388,12 @@ function initChat() {
         if (turnInterval) clearInterval(turnInterval);
         setThinking(true);
         if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ event: 'send_answer', payload: { answer_text: messageText } }));
+            ws.send(JSON.stringify({ event: 'candidate_answer', payload: { answer: messageText } }));
         }
-    }
-
-    function endInterview() {
-        const confirmed = window.confirm('Are you sure you want to end the interview?');
-        if (!confirmed) return;
-        setThinking(false);
-        chatInput.disabled = true;
-        sendButton.disabled = true;
-        if (skipButton) skipButton.disabled = true;
-        if (endButton) endButton.disabled = true;
-        if (statusText) statusText.textContent = 'Ending interview...';
-        if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ event: 'end_interview' }));
-        }
-        stopTimers();
-    }
-
-    function skipQuestion() {
-        addLog('Candidate skipped the question');
-        if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ event: 'skip_question' }));
-        }
-        setThinking(true);
     }
 
     sendButton.addEventListener('click', sendMessage);
     chatInput.addEventListener('keypress', (e) => e.key === 'Enter' && sendMessage());
-    if (skipButton) skipButton.addEventListener('click', skipQuestion);
-    if (endButton) endButton.addEventListener('click', endInterview);
     if (reportButton) reportButton.addEventListener('click', () => {
         if (!sessionId) return;
         fetch(`${ORCH_BASE}/api/v1/sessions/${sessionId}/report`).then(r => r.blob()).then(blob => {

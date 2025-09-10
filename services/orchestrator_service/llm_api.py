@@ -1,6 +1,6 @@
 """Core AI interview utilities."""
 
-from typing import List
+from typing import Dict, List, Optional
 
 from .schemas import (
     InterviewRequest,
@@ -8,6 +8,8 @@ from .schemas import (
     InterviewBlueprintResponse,
     EvaluationRequest,
     EvaluationResponse,
+    ContextPacket,
+    VerificationResult,
 )
 from gateway_service import gateway
 from interviewer_service.personas import PERSONA_PROMPTS
@@ -193,6 +195,214 @@ async def generate_final_summary(performance_log: List[dict]) -> dict:
 _interviewer = LLMInterviewer()
 _monitor = LLMMonitor()
 _scoring = ScoringEngine()
+
+
+def _decrement_time(packet: ContextPacket, minutes: int) -> None:
+    """Reduce available interview time on the context packet."""
+
+    remaining = packet.time_remaining_min or packet.duration_min
+    packet.time_remaining_min = max(remaining - minutes, 0)
+
+
+async def analyze_jd_resume(
+    jd_text: str, resume_text: str, duration_min: int = 18
+) -> ContextPacket:
+    """Stage-0: Analyze job description and resume to build the context packet."""
+
+    system_prompt = (
+        "Read the job description and resume. Return JSON with the following keys: "
+        "role_from_jd, jd_core_skills (list), resume_claims (list), "
+        "overlap_skills (list), primary_overlap_focus."
+    )
+    user_prompt = f"Job description:\n{jd_text}\n\nResume:\n{resume_text}"
+
+    data = await gateway.execute_task(
+        task_name="stage_0_analysis",
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+    )
+
+    packet = ContextPacket(
+        jd_text=jd_text,
+        resume_text=resume_text,
+        duration_min=duration_min,
+        role_from_jd=data.get("role_from_jd"),
+        jd_core_skills=data.get("jd_core_skills", []),
+        resume_claims=data.get("resume_claims", []),
+        overlap_skills=data.get("overlap_skills", []),
+        primary_overlap_focus=data.get("primary_overlap_focus"),
+    )
+    packet.time_remaining_min = packet.duration_min
+    return packet
+
+
+async def warmup_overview(
+    packet: ContextPacket, answer: Optional[str] = None
+) -> Optional[str]:
+    """Stage-1: Ask for a project overview and record goal and constraints."""
+
+    if answer is None:
+        prompt = (
+            "Give me a 60–90 sec overview of a project most relevant to "
+            f"{packet.primary_overlap_focus}: goal, your role, key constraints."
+        )
+        _decrement_time(packet, 1)
+        return prompt
+
+    system_prompt = (
+        "Extract the project goal and list of key constraints from the answer. "
+        "Respond with JSON having 'goal' and 'constraints' (list)."
+    )
+    data = await gateway.execute_task(
+        task_name="stage_1_parse",
+        system_prompt=system_prompt,
+        user_prompt=answer,
+    )
+    packet.project_context.goal = data.get("goal")
+    packet.project_context.constraints = data.get("constraints", [])
+    return None
+
+
+async def warmup_constraint(
+    packet: ContextPacket, answer: Optional[str] = None
+) -> Optional[str]:
+    """Stage-1: Ask about hardest constraint and capture scale/latency info."""
+
+    if answer is None:
+        question = (
+            "What was the hardest constraint (scale, latency/SLA, reliability, cost) "
+            "and how did it shape your design?"
+        )
+        _decrement_time(packet, 1)
+        return question
+
+    system_prompt = (
+        "Extract any scale, latency, or SLO details from the answer. "
+        "Respond with JSON {\"scale_latency_slo\": string}."
+    )
+    data = await gateway.execute_task(
+        task_name="stage_1_parse",
+        system_prompt=system_prompt,
+        user_prompt=answer,
+    )
+    packet.project_context.scale_latency_slo = data.get("scale_latency_slo")
+    return None
+
+
+async def evidence_skill_question(
+    packet: ContextPacket, answer: Optional[str] = None
+) -> Optional[str]:
+    """Stage-2: Gather concrete responsibilities and skill hooks."""
+
+    skills = packet.overlap_skills or packet.jd_core_skills
+
+    if answer is None:
+        skill_list = ", ".join(skills)
+        question = (
+            "Name 2–3 components you directly built/owned. For each: purpose, "
+            "main interfaces, and your exact contribution. For the following "
+            f"skills, describe one task you completed and rate your confidence "
+            f"1–5: {skill_list}."
+        )
+        _decrement_time(packet, 4)
+        return question
+
+    system_prompt = (
+        "From the answer, extract:"
+        " skill_hooks (list of 3-5 concise items to verify later),"
+        " confidence_ratings (mapping skill->1-5),"
+        " and notes (brief bullets)."
+        " Respond with JSON containing these keys."
+    )
+    data = await gateway.execute_task(
+        task_name="stage_2_parse",
+        system_prompt=system_prompt,
+        user_prompt=answer,
+    )
+    packet.skill_hooks = data.get("skill_hooks", [])
+    packet.confidence_ratings.update(data.get("confidence_ratings", {}))
+    packet.notes.extend(data.get("notes", []))
+    return None
+
+
+async def theory_check_question(
+    packet: ContextPacket, answer: Optional[str] = None
+) -> Optional[str]:
+    """Stage-3: Verify fundamentals for each skill hook."""
+
+    skills = packet.skill_hooks or packet.jd_core_skills
+    idx = len(packet.verifications)
+    if idx >= len(skills):
+        return None
+    skill = skills[idx]
+
+    if answer is None:
+        confidence = packet.confidence_ratings.get(skill, 3)
+        system_prompt = (
+            f"You are verifying understanding of '{skill}'. Candidate self-rated "
+            f"confidence {confidence}/5. Ask one concise concept-first question. "
+            'Respond with JSON {"question_text": string}.'
+        )
+        data = await gateway.execute_task(
+            task_name="stage_3_question",
+            system_prompt=system_prompt,
+        )
+        _decrement_time(packet, 1)
+        return data.get("question_text")
+
+    system_prompt = (
+        "Evaluate the answer for correctness and depth. Respond with JSON "
+        '{"result": string, "rationale": string}.'
+    )
+    data = await gateway.execute_task(
+        task_name="stage_3_eval",
+        system_prompt=system_prompt,
+        user_prompt=answer,
+    )
+    packet.verifications.append(
+        VerificationResult(
+            skill=skill,
+            result=data.get("result"),
+            rationale=data.get("rationale"),
+        )
+    )
+    return None
+
+
+async def wrap_up(packet: ContextPacket, answer: Optional[str] = None) -> Optional[str]:
+    """Stage-4: Conclude the interview and capture a summary."""
+
+    if answer is None:
+        question = "Any questions about the role, roadmap, or stack?"
+        _decrement_time(packet, 1)
+        return question
+
+    system_prompt = (
+        "Using the prior notes and verification results, produce a brief "
+        "internal summary with keys strengths, risks, follow_ups. Respond in "
+        "JSON."
+    )
+    notes_blob = "; ".join(packet.notes)
+    verif_blob = "; ".join(
+        f"{v.skill}:{v.result}" for v in packet.verifications
+    )
+    user_prompt = f"Notes: {notes_blob}\nVerifications: {verif_blob}"
+    data = await gateway.execute_task(
+        task_name="stage_4_summary",
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+    )
+    strengths = data.get("strengths", [])
+    risks = data.get("risks", [])
+    follow_ups = data.get("follow_ups", [])
+    if strengths:
+        packet.notes.append("Strengths: " + ", ".join(strengths))
+    if risks:
+        packet.notes.append("Risks: " + ", ".join(risks))
+    if follow_ups:
+        packet.notes.append("Follow-ups: " + ", ".join(follow_ups))
+    packet.time_remaining_min = 0
+    return None
 
 
 async def on_question_selected(question: str, state: dict | None = None) -> dict:
