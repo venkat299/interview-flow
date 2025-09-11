@@ -36,6 +36,8 @@ class InterviewState:
         self.phase_index = 0
         # Stage-based step indexes
         self.warmup_index = 0
+        self.evidence_index = 0
+        self.wrapup_index = 0
 
         # Metadata for logging
         self.session_id = session_id
