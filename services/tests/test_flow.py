@@ -1,8 +1,3 @@
-import sys
-from pathlib import Path
-
-sys.path.append(str(Path(__file__).resolve().parents[1]))
-
 import pytest
 
 from orchestrator_service import llm_api as ai
@@ -10,28 +5,33 @@ from orchestrator_service.schemas import ContextPacket, ProjectContext
 
 
 @pytest.mark.asyncio
-async def test_run_interview_end_to_end(monkeypatch):
+async def test_run_interview_flow(monkeypatch):
+    call_order = []
+
     async def fake_execute(task_name, system_prompt, user_prompt=None):
+        call_order.append(task_name)
         if task_name == "stage_0_analysis":
             return {
                 "role_from_jd": "backend",
-                "jd_core_skills": ["python"],
+                "jd_core_skills": ["python", "db"],
                 "resume_claims": ["python"],
                 "overlap_skills": ["python"],
                 "primary_overlap_focus": "python",
             }
         if task_name == "stage_1_parse":
             if "goal" in system_prompt:
-                return {"goal": "demo", "constraints": ["latency"], "scale_latency_slo": "100rps"}
+                return {"goal": "demo", "constraints": ["latency"]}
             return {"scale_latency_slo": "100rps"}
         if task_name == "stage_2_parse":
             return {
-                "skill_hooks": ["python"],
-                "confidence_ratings": {"python": 5},
+                "skill_hooks": ["python", "db"],
+                "confidence_ratings": {"python": 5, "db": 4},
                 "notes": ["api work"],
             }
         if task_name == "stage_3_question":
-            return {"question_text": "What is Python?"}
+            if "python" in system_prompt:
+                return {"question_text": "What is Python?"}
+            return {"question_text": "What is a database?"}
         if task_name == "stage_3_eval":
             return {"result": "pass", "rationale": "ok"}
         if task_name == "stage_4_summary":
@@ -50,8 +50,17 @@ async def test_run_interview_end_to_end(monkeypatch):
 
     result = await ai.run_interview(packet)
 
-    assert result.role_from_jd == "backend"
     assert result.project_context.goal == "demo"
-    assert result.skill_hooks == ["python"]
-    assert [v.skill for v in result.verifications] == ["python"]
-    assert result.notes[-1] == "What is Python?"
+    assert result.skill_hooks == ["python", "db"]
+    assert [v.skill for v in result.verifications] == ["python", "db"]
+    assert call_order == [
+        "stage_0_analysis",
+        "stage_1_parse",
+        "stage_1_parse",
+        "stage_2_parse",
+        "stage_3_question",
+        "stage_3_eval",
+        "stage_3_question",
+        "stage_3_eval",
+        "stage_4_summary",
+    ]

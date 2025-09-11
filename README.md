@@ -72,6 +72,16 @@ The orchestrator advances the conversation through five stages:
 
 See `application-flow.md` for a detailed walkthrough of these stages and service interactions.
 
+### LangGraph Orchestration
+
+Interview transitions are modeled as a LangGraph state machine in
+`services/orchestrator_service/flow.py`.  Each stage is implemented as a
+node that wraps a small DSPy program with Pydantic input and output
+models.  The helper `run_interview` executes the compiled graph starting
+from an initial `ContextPacket` and returns the final packet after all
+nodes run.  To introduce a new stage, create the DSPy program and add the
+corresponding node and edges in `build_interview_graph`.
+
 
 ## 4. Test Frontend & End-to-End Testing
 

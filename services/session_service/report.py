@@ -272,5 +272,8 @@ def generate_report_pdf(session: Dict, turns: List[Dict]) -> bytes:
     pdf.set_font(pdf._font_regular, "", 10)
     pdf.multi_cell(_epw(pdf), 5, f"{dash} Interview ended by: {ended_label}")
 
-    out = pdf.output()
-    return bytes(out)
+    # Some versions of FPDF return ``str`` from ``output``; ensure bytes.
+    out = pdf.output(dest="S")
+    if isinstance(out, bytearray):
+        out = bytes(out)
+    return out if isinstance(out, bytes) else out.encode("latin-1")

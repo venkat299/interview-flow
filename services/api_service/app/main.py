@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from starlette.websockets import WebSocketState
 from contextlib import asynccontextmanager
 import httpx
 from fastapi.middleware.cors import CORSMiddleware
@@ -187,6 +188,9 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str) -> None:
         while True:
             data = await websocket.receive_json()
             await ws_manager.handle_message(websocket, data)
+            # Break the loop if the connection was closed within the handler
+            if websocket.application_state == WebSocketState.DISCONNECTED:
+                break
     except WebSocketDisconnect:
         ws_manager.disconnect(websocket)
 

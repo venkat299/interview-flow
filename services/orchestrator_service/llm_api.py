@@ -40,6 +40,7 @@ from .programs.stage4_wrapup import (
     WrapUpProgram,
     WrapUpInput,
 )
+from .flow import build_interview_graph
 
 
 
@@ -207,6 +208,7 @@ _evidence = EvidenceProgram()
 _theory_question = TheoryQuestionProgram()
 _theory_eval = TheoryEvalProgram()
 _wrap_up = WrapUpProgram()
+_graph = build_interview_graph()
 
 
 def _decrement_time(packet: ContextPacket, minutes: int) -> None:
@@ -350,6 +352,12 @@ async def wrap_up(packet: ContextPacket, answer: Optional[str] = None) -> Option
         packet.notes.append("Follow-ups: " + ", ".join(out.follow_ups))
     packet.time_remaining_min = 0
     return None
+
+
+async def run_interview(packet: ContextPacket) -> ContextPacket:
+    """Execute the full LangGraph interview flow starting from ``packet``."""
+    result = await _graph.ainvoke(packet)
+    return ContextPacket.model_validate(result)
 
 
 async def on_question_selected(question: str, state: dict | None = None) -> dict:
