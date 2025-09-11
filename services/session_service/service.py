@@ -23,6 +23,8 @@ class ConnectionManager:
         self.orchestrator = Orchestrator()
         # Track session IDs per connection for DB persistence
         self.session_ids: Dict[WebSocket, str] = {}
+        # Track last question type for logging answers
+        self.question_types: Dict[WebSocket, str] = {}
 
     async def connect(self, websocket: WebSocket, session_id: str) -> None:
         await websocket.accept()
@@ -32,6 +34,7 @@ class ConnectionManager:
         self.states.pop(websocket, None)
         self.history.pop(websocket, None)
         self.session_ids.pop(websocket, None)
+        self.question_types.pop(websocket, None)
 
     async def handle_message(self, websocket: WebSocket, data: dict) -> None:
         event = data.get("event")
@@ -101,9 +104,12 @@ class ConnectionManager:
                 pass
 
             prev_stage = state.current_phase
-            question = await self.orchestrator.loop(state)
-            if question:
+            q_payload = await self.orchestrator.loop(state)
+            if q_payload:
+                question = q_payload["question_text"]
+                qtype = q_payload.get("question_type")
                 self.history[websocket].append({"role": "interviewer", "message": question})
+                self.question_types[websocket] = qtype or ""
                 # If stage advanced during orchestration, inform client
                 try:
                     if state.current_phase != prev_stage:
@@ -115,10 +121,15 @@ class ConnectionManager:
                     await websocket.send_json({"event": "context_packet", "payload": state.packet.model_dump()})
                 except Exception:
                     pass
-                # Persist interviewer question so auto-answer can find it
+                # Persist interviewer question with metadata
                 try:
                     if session_id:
-                        log_turn(session_id, "interviewer", question)
+                        log_turn(
+                            session_id,
+                            "interviewer",
+                            question,
+                            {"stage": state.current_phase, "question_type": qtype},
+                        )
                 except Exception:
                     pass
                 await websocket.send_json(
@@ -127,6 +138,7 @@ class ConnectionManager:
                         "payload": {
                             "question_text": question,
                             "stage": state.current_phase,
+                            "question_type": qtype,
                         },
                     }
                 )
@@ -139,17 +151,23 @@ class ConnectionManager:
             payload = data.get("payload", {})
             # Support both payload shapes
             answer = payload.get("answer") or payload.get("answer_text") or ""
-            # Persist candidate answer
+            # Persist candidate answer with metadata
             try:
                 session_id = self.session_ids.get(websocket)
+                qtype = self.question_types.get(websocket)
                 if session_id and answer:
-                    log_turn(session_id, "candidate", answer)
+                    log_turn(
+                        session_id,
+                        "candidate",
+                        answer,
+                        {"stage": state.current_phase, "question_type": qtype},
+                    )
             except Exception:
                 pass
             self.history.setdefault(websocket, []).append({"role": "candidate", "message": answer})
             prev_stage = state.current_phase
-            question = await self.orchestrator.loop(state, answer)
-            if question is None:
+            q_payload = await self.orchestrator.loop(state, answer)
+            if q_payload is None:
                 # If we just transitioned into wrap_up and ended, emit stage_changed once
                 try:
                     if prev_stage != "wrap_up":
@@ -165,7 +183,10 @@ class ConnectionManager:
                 await websocket.close()
                 self.disconnect(websocket)
                 return
+            question = q_payload["question_text"]
+            qtype = q_payload.get("question_type")
             self.history[websocket].append({"role": "interviewer", "message": question})
+            self.question_types[websocket] = qtype or ""
             # If stage advanced during orchestration, inform client
             try:
                 if state.current_phase != prev_stage:
@@ -181,7 +202,12 @@ class ConnectionManager:
             try:
                 session_id = self.session_ids.get(websocket)
                 if session_id and question:
-                    log_turn(session_id, "interviewer", question)
+                    log_turn(
+                        session_id,
+                        "interviewer",
+                        question,
+                        {"stage": state.current_phase, "question_type": qtype},
+                    )
             except Exception:
                 pass
             await websocket.send_json(
@@ -190,6 +216,7 @@ class ConnectionManager:
                     "payload": {
                         "question_text": question,
                         "stage": state.current_phase,
+                        "question_type": qtype,
                     },
                 }
             )
