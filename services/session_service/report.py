@@ -2,6 +2,11 @@
 from typing import Dict, List
 
 from fpdf import FPDF
+try:
+    from fpdf.enums import XPos, YPos
+except Exception:  # Backwards compatibility for older fpdf2
+    XPos = type("XPos", (), {"RIGHT": "", "LMARGIN": ""})
+    YPos = type("YPos", (), {"TOP": "", "NEXT": ""})
 
 # System font paths provided by fonts-dejavu-core (installed in Dockerfile)
 DEJAVU_SANS = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
@@ -37,12 +42,20 @@ class ReportPDF(FPDF):
             # Colored banner; adapt height to wrapped title
             title_h = 8
             self.set_font(self._font_bold, "B", 16)
+            # Compute number of wrapped lines without rendering
+            n_lines = 1
             try:
-                lines = self.multi_cell(usable_w, title_h, self.header_title, split_only=True)
-                n_lines = len(lines) if isinstance(lines, (list, tuple)) else 1
+                lines = self.multi_cell(usable_w, title_h, self.header_title, dry_run=True, output="LINES")
+                if isinstance(lines, (list, tuple)):
+                    n_lines = len(lines)
             except TypeError:
-                # Older fpdf2 may not support split_only; assume 1 line
-                n_lines = 1
+                try:
+                    # Fallback for very old fpdf2
+                    lines = self.multi_cell(usable_w, title_h, self.header_title, split_only=True)
+                    if isinstance(lines, (list, tuple)):
+                        n_lines = len(lines)
+                except TypeError:
+                    n_lines = 1
             banner_h = 6 + n_lines * title_h + 4
             self.set_fill_color(*self.accent)
             self.rect(0, 0, self.w, banner_h, style="F")
@@ -80,7 +93,10 @@ def _section_title(pdf: FPDF, text: str) -> None:
     pdf.set_text_color(*TEXT)
     pdf.set_x(pdf.l_margin)
     pdf.set_font(pdf._font_bold, "B", 13)
-    pdf.cell(0, 9, text, ln=1)
+    try:
+        pdf.cell(0, 9, text, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    except TypeError:
+        pdf.cell(0, 9, text, ln=1)
     pdf.set_draw_color(*RULE)
     pdf.set_line_width(0.2)
     y = pdf.get_y()
@@ -100,7 +116,10 @@ def _score_card(pdf: FPDF, score: float | None) -> None:
     pdf.set_xy(pdf.l_margin + 6, y + 5)
     pdf.set_text_color(*MUTED)
     pdf.set_font(pdf._font_bold, "B", 11)
-    pdf.cell(w - 12, 6, "Overall Score", ln=0)
+    try:
+        pdf.cell(w - 12, 6, "Overall Score", new_x=XPos.RIGHT, new_y=YPos.TOP)
+    except TypeError:
+        pdf.cell(w - 12, 6, "Overall Score", ln=0)
     # Value
     pdf.set_text_color(*ACCENT)
     pdf.set_font(pdf._font_bold, "B", 14)
@@ -133,15 +152,27 @@ def _meta_block(pdf: FPDF, pairs: List[tuple[str, str]]) -> None:
         # Left label
         pdf.set_text_color(*MUTED)
         pdf.set_font(pdf._font_regular, "", 10)
-        pdf.cell(col_w, line_h, left[0], ln=0)
+        try:
+            pdf.cell(col_w, line_h, left[0], new_x=XPos.RIGHT, new_y=YPos.TOP)
+        except TypeError:
+            pdf.cell(col_w, line_h, left[0], ln=0)
         # Right label
-        pdf.cell(col_w, line_h, right[0], ln=1)
+        try:
+            pdf.cell(col_w, line_h, right[0], new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        except TypeError:
+            pdf.cell(col_w, line_h, right[0], ln=1)
         # Values
         pdf.set_x(pdf.l_margin)
         pdf.set_text_color(*TEXT)
         pdf.set_font(pdf._font_bold, "B", 11)
-        pdf.cell(col_w, line_h, left[1], ln=0)
-        pdf.cell(col_w, line_h, right[1], ln=1)
+        try:
+            pdf.cell(col_w, line_h, left[1], new_x=XPos.RIGHT, new_y=YPos.TOP)
+        except TypeError:
+            pdf.cell(col_w, line_h, left[1], ln=0)
+        try:
+            pdf.cell(col_w, line_h, right[1], new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        except TypeError:
+            pdf.cell(col_w, line_h, right[1], ln=1)
     pdf.ln(2)
 
 
@@ -156,8 +187,8 @@ def generate_report_pdf(session: Dict, turns: List[Dict]) -> bytes:
     pdf.alias_nb_pages()
     # Register and use a Unicode-capable font to avoid encoding errors
     try:
-        pdf.add_font("DejaVu", "", DEJAVU_SANS, uni=True)
-        pdf.add_font("DejaVu", "B", DEJAVU_SANS_BOLD, uni=True)
+        pdf.add_font("DejaVu", "", DEJAVU_SANS)
+        pdf.add_font("DejaVu", "B", DEJAVU_SANS_BOLD)
         pdf._font_regular = "DejaVu"
         pdf._font_bold = "DejaVu"
     except Exception:
@@ -223,7 +254,10 @@ def generate_report_pdf(session: Dict, turns: List[Dict]) -> bytes:
         pdf.set_x(pdf.l_margin)
         pdf.set_text_color(*label_color)
         pdf.set_font(pdf._font_bold, "B", 10)
-        pdf.cell(0, 5, f"{role.title()}", ln=1)
+        try:
+            pdf.cell(0, 5, f"{role.title()}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        except TypeError:
+            pdf.cell(0, 5, f"{role.title()}", ln=1)
         pdf.set_x(pdf.l_margin)
         pdf.set_text_color(*TEXT)
         pdf.set_font(pdf._font_regular, "", 10)
@@ -239,4 +273,5 @@ def generate_report_pdf(session: Dict, turns: List[Dict]) -> bytes:
     pdf.set_font(pdf._font_regular, "", 10)
     pdf.multi_cell(_epw(pdf), 5, f"{dash} Interview ended by: {ended_label}")
 
-    return bytes(pdf.output(dest="S"))
+    out = pdf.output()
+    return bytes(out)

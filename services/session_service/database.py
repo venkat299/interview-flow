@@ -1,6 +1,6 @@
 import json
 import sqlite3
-from datetime import datetime
+from datetime import datetime, UTC
 from pathlib import Path
 from typing import Optional, Dict, List, Any
 
@@ -79,7 +79,7 @@ def create_session(
         "INSERT OR REPLACE INTO sessions (session_id, start_time, blueprint, time_limit, word_limit) VALUES (?, ?, ?, ?, ?)",
         (
             session_id,
-            datetime.utcnow().isoformat(),
+            datetime.now(UTC).isoformat(),
             json.dumps(blueprint),
             time_limit,
             word_limit,
@@ -124,7 +124,7 @@ def end_session(
     cur.execute(
         "UPDATE sessions SET end_time = ?, rubric = ?, transcript = ?, final_duration = ?, final_word_count = ?, final_score = ?, summary = ?, ended_by = ? WHERE session_id = ?",
         (
-            datetime.utcnow().isoformat(),
+            datetime.now(UTC).isoformat(),
             json.dumps(rubric) if rubric is not None else None,
             json.dumps(transcript) if transcript is not None else None,
             duration,

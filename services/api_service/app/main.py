@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from contextlib import asynccontextmanager
 import httpx
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -34,7 +35,16 @@ from session_service.database import (
 from session_service.report import generate_report_pdf
 from fastapi.responses import Response
 
-app = FastAPI(title="API Service")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    samples.init_db()
+    samples.seed_if_empty()
+    yield
+    # Shutdown (nothing to cleanup currently)
+
+
+app = FastAPI(title="API Service", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -78,10 +88,7 @@ async def evaluate_answer(request: EvaluationRequest) -> EvaluationResponse:
 # ---- Sample data endpoints (SQLite-backed) ----
 
 
-@app.on_event("startup")
-def _startup_init_samples() -> None:
-    samples.init_db()
-    samples.seed_if_empty()
+# Startup handled in lifespan above
 
 @app.get("/job-postings")
 def list_job_postings():

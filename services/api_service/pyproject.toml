@@ -10,9 +10,14 @@ dependencies = [
     "uvicorn[standard]>=0.35.0",
     "httpx>=0.28.1",
     "pydantic>=2.11.7",
-    "pytest>=8.4.1",
-    "pytest-asyncio>=1.1.0",
+    "python-dotenv>=1.0.1",
     "PyYAML>=6.0.2",
     "fpdf2>=2.7.0",
+]
+
+[project.optional-dependencies]
+test_dependencies = [
+    "pytest>=8.4.1",
+    "pytest-asyncio>=1.1.0",
 ]
 
