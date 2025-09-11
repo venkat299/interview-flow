@@ -249,9 +249,9 @@ async def warmup_overview(
     if answer is None:
         system_prompt = (
             "You are an AI technical interviewer. Generate a single warm-up question "
-            f"asking the candidate for a 60–90 second overview of a project most relevant to {packet.primary_overlap_focus}. "
+            f"asking the candidate for a 1 or 2 minute overview of a project most relevant to {packet.primary_overlap_focus}. "
             f"The role is {packet.role_from_jd}. The question should solicit the project's goal, the candidate's role, and key constraints. "
-            "Respond ONLY with a single, valid JSON object with a single key 'question_text'."
+            "Respond ONLY with a single, valid JSON object with a single key 'question_text'. Question should be concise"
         )
         data = await gateway.execute_task(
             task_name="question_generation",
