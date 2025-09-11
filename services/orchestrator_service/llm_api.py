@@ -16,6 +16,30 @@ from interviewer_service.personas import PERSONA_PROMPTS
 from interviewer_service import LLMInterviewer
 from monitor_service import LLMMonitor
 from scoring_service import ScoringEngine
+from .programs.stage0_analysis import (
+    Stage0AnalysisProgram,
+    JDResumeAnalysisInput,
+)
+from .programs.stage1_warmup import (
+    WarmupOverviewProgram,
+    WarmupOverviewInput,
+    WarmupConstraintProgram,
+    WarmupConstraintInput,
+)
+from .programs.stage2_evidence import (
+    EvidenceProgram,
+    EvidenceInput,
+)
+from .programs.stage3_theory import (
+    TheoryQuestionProgram,
+    TheoryQuestionInput,
+    TheoryEvalProgram,
+    TheoryEvalInput,
+)
+from .programs.stage4_wrapup import (
+    WrapUpProgram,
+    WrapUpInput,
+)
 
 
 
@@ -176,6 +200,13 @@ async def evaluate_candidate_answer(
 _interviewer = LLMInterviewer()
 _monitor = LLMMonitor()
 _scoring = ScoringEngine()
+_stage0 = Stage0AnalysisProgram()
+_warmup_overview = WarmupOverviewProgram()
+_warmup_constraint = WarmupConstraintProgram()
+_evidence = EvidenceProgram()
+_theory_question = TheoryQuestionProgram()
+_theory_eval = TheoryEvalProgram()
+_wrap_up = WrapUpProgram()
 
 
 def _decrement_time(packet: ContextPacket, minutes: int) -> None:
@@ -190,28 +221,19 @@ async def analyze_jd_resume(
 ) -> ContextPacket:
     """Stage-0: Analyze job description and resume to build the context packet."""
 
-    system_prompt = (
-        "Read the job description and resume. Return JSON with the following keys: "
-        "role_from_jd, jd_core_skills (list), resume_claims (list), "
-        "overlap_skills (list), primary_overlap_focus."
-    )
-    user_prompt = f"Job description:\n{jd_text}\n\nResume:\n{resume_text}"
-
-    data = await gateway.execute_task(
-        task_name="stage_0_analysis",
-        system_prompt=system_prompt,
-        user_prompt=user_prompt,
+    out = await _stage0(
+        JDResumeAnalysisInput(jd_text=jd_text, resume_text=resume_text)
     )
 
     packet = ContextPacket(
         jd_text=jd_text,
         resume_text=resume_text,
         duration_min=duration_min,
-        role_from_jd=data.get("role_from_jd"),
-        jd_core_skills=data.get("jd_core_skills", []),
-        resume_claims=data.get("resume_claims", []),
-        overlap_skills=data.get("overlap_skills", []),
-        primary_overlap_focus=data.get("primary_overlap_focus"),
+        role_from_jd=out.role_from_jd,
+        jd_core_skills=out.jd_core_skills,
+        resume_claims=out.resume_claims,
+        overlap_skills=out.overlap_skills,
+        primary_overlap_focus=out.primary_overlap_focus,
     )
     packet.time_remaining_min = packet.duration_min
     return packet
@@ -230,17 +252,9 @@ async def warmup_overview(
         _decrement_time(packet, 1)
         return prompt
 
-    system_prompt = (
-        "Extract the project goal and list of key constraints from the answer. "
-        "Respond with JSON having 'goal' and 'constraints' (list)."
-    )
-    data = await gateway.execute_task(
-        task_name="stage_1_parse",
-        system_prompt=system_prompt,
-        user_prompt=answer,
-    )
-    packet.project_context.goal = data.get("goal")
-    packet.project_context.constraints = data.get("constraints", [])
+    out = await _warmup_overview(WarmupOverviewInput(answer=answer))
+    packet.project_context.goal = out.goal
+    packet.project_context.constraints = out.constraints
     return None
 
 
@@ -257,16 +271,8 @@ async def warmup_constraint(
         _decrement_time(packet, 1)
         return question
 
-    system_prompt = (
-        "Extract any scale, latency, or SLO details from the answer. "
-        "Respond with JSON {\"scale_latency_slo\": string}."
-    )
-    data = await gateway.execute_task(
-        task_name="stage_1_parse",
-        system_prompt=system_prompt,
-        user_prompt=answer,
-    )
-    packet.project_context.scale_latency_slo = data.get("scale_latency_slo")
+    out = await _warmup_constraint(WarmupConstraintInput(answer=answer))
+    packet.project_context.scale_latency_slo = out.scale_latency_slo
     return None
 
 
@@ -288,21 +294,10 @@ async def evidence_skill_question(
         _decrement_time(packet, 4)
         return question
 
-    system_prompt = (
-        "From the answer, extract:"
-        " skill_hooks (list of 3-5 concise items to verify later),"
-        " confidence_ratings (mapping skill->1-5),"
-        " and notes (brief bullets)."
-        " Respond with JSON containing these keys."
-    )
-    data = await gateway.execute_task(
-        task_name="stage_2_parse",
-        system_prompt=system_prompt,
-        user_prompt=answer,
-    )
-    packet.skill_hooks = data.get("skill_hooks", [])
-    packet.confidence_ratings.update(data.get("confidence_ratings", {}))
-    packet.notes.extend(data.get("notes", []))
+    out = await _evidence(EvidenceInput(answer=answer))
+    packet.skill_hooks = out.skill_hooks
+    packet.confidence_ratings.update(out.confidence_ratings)
+    packet.notes.extend(out.notes)
     return None
 
 
@@ -319,32 +314,18 @@ async def theory_check_question(
 
     if answer is None:
         confidence = packet.confidence_ratings.get(skill, 3)
-        system_prompt = (
-            f"You are verifying understanding of '{skill}'. Candidate self-rated "
-            f"confidence {confidence}/5. Ask one concise concept-first question. "
-            'Respond with JSON {"question_text": string}.'
-        )
-        data = await gateway.execute_task(
-            task_name="stage_3_question",
-            system_prompt=system_prompt,
+        q_out = await _theory_question(
+            TheoryQuestionInput(skill=skill, confidence=confidence)
         )
         _decrement_time(packet, 1)
-        return data.get("question_text")
+        return q_out.question_text
 
-    system_prompt = (
-        "Evaluate the answer for correctness and depth. Respond with JSON "
-        '{"result": string, "rationale": string}.'
-    )
-    data = await gateway.execute_task(
-        task_name="stage_3_eval",
-        system_prompt=system_prompt,
-        user_prompt=answer,
-    )
+    e_out = await _theory_eval(TheoryEvalInput(answer=answer))
     packet.verifications.append(
         VerificationResult(
             skill=skill,
-            result=data.get("result"),
-            rationale=data.get("rationale"),
+            result=e_out.result,
+            rationale=e_out.rationale,
         )
     )
     return None
@@ -358,30 +339,15 @@ async def wrap_up(packet: ContextPacket, answer: Optional[str] = None) -> Option
         _decrement_time(packet, 1)
         return question
 
-    system_prompt = (
-        "Using the prior notes and verification results, produce a brief "
-        "internal summary with keys strengths, risks, follow_ups. Respond in "
-        "JSON."
+    out = await _wrap_up(
+        WrapUpInput(notes=packet.notes, verifications=packet.verifications)
     )
-    notes_blob = "; ".join(packet.notes)
-    verif_blob = "; ".join(
-        f"{v.skill}:{v.result}" for v in packet.verifications
-    )
-    user_prompt = f"Notes: {notes_blob}\nVerifications: {verif_blob}"
-    data = await gateway.execute_task(
-        task_name="stage_4_summary",
-        system_prompt=system_prompt,
-        user_prompt=user_prompt,
-    )
-    strengths = data.get("strengths", [])
-    risks = data.get("risks", [])
-    follow_ups = data.get("follow_ups", [])
-    if strengths:
-        packet.notes.append("Strengths: " + ", ".join(strengths))
-    if risks:
-        packet.notes.append("Risks: " + ", ".join(risks))
-    if follow_ups:
-        packet.notes.append("Follow-ups: " + ", ".join(follow_ups))
+    if out.strengths:
+        packet.notes.append("Strengths: " + ", ".join(out.strengths))
+    if out.risks:
+        packet.notes.append("Risks: " + ", ".join(out.risks))
+    if out.follow_ups:
+        packet.notes.append("Follow-ups: " + ", ".join(out.follow_ups))
     packet.time_remaining_min = 0
     return None
 
