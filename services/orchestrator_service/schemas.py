@@ -76,6 +76,13 @@ class ProjectContext(BaseModel):
     goal: Optional[str] = None
     constraints: List[str] = Field(default_factory=list)
     scale_latency_slo: Optional[str] = None
+    role: Optional[str] = None
+    team_size: Optional[str] = None
+    architecture: Optional[str] = None
+    key_technologies: List[str] = Field(default_factory=list)
+    challenge: Optional[str] = None
+    outcome: Optional[str] = None
+    reflection: Optional[str] = None
 
 
 class VerificationResult(BaseModel):
