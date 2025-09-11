@@ -61,13 +61,8 @@ class AIGateway:
 
     def _get_client(self, provider: str) -> httpx.AsyncClient:
         if provider not in self._clients:
-            timeout = httpx.Timeout(
-                connect=settings.llm_connect_timeout,
-                read=settings.llm_timeout,
-                write=settings.llm_timeout,
-                pool=settings.llm_timeout,
-            )
-            self._clients[provider] = httpx.AsyncClient(timeout=timeout)
+            # Disable HTTP timeouts for LLM requests (per user request)
+            self._clients[provider] = httpx.AsyncClient(timeout=None)
         return self._clients[provider]
 
     async def execute_task(self, task_name: str, system_prompt: str, user_prompt: Optional[str] = None) -> Any:
@@ -114,23 +109,8 @@ class AIGateway:
             headers["Authorization"] = f"Bearer {api_key}"
 
         client = self._get_client(provider_name)
-        # Allow per-task/provider timeout override (seconds)
-        read_to = settings.llm_timeout
-        connect_to = settings.llm_connect_timeout
-        try:
-            if isinstance((provider_cfg or {}).get("timeout"), (int, float)):
-                read_to = float(provider_cfg.get("timeout"))
-            if isinstance((task_cfg or {}).get("timeout"), (int, float)):
-                read_to = float(task_cfg.get("timeout"))
-        except Exception:
-            pass
-        req_timeout = httpx.Timeout(
-            connect=connect_to,
-            read=read_to,
-            write=read_to,
-            pool=read_to,
-        )
-        response = await client.post(url, headers=headers, json=payload, timeout=req_timeout)
+        # No per-request timeout for LLM calls (disabled by request)
+        response = await client.post(url, headers=headers, json=payload)
         response.raise_for_status()
         raw = response.json()
 

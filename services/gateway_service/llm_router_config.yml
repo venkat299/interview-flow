@@ -17,11 +17,10 @@ providers:
     base_url: https://1175be4d9760.ngrok-free.app/v1/chat/completions
     api_key: ""
     model: openai/gpt-oss-20b
-    # Keep responses bounded and faster; tweak as needed
-    max_tokens: 512
+    # Optional generation controls (disabled by request)
+    # max_tokens: 512
     temperature: 0.7
-    # Allow slower local model responses without failing the request
-    timeout: 120
+    # timeout: 120
 
   # Optional: keep OpenAI config for fallback/manual switching
   openai:
@@ -39,10 +38,9 @@ tasks:
   # Heavier tasks used by the app-test endpoints
   fake_candidate_profile:
     provider: local
-    # Slightly higher timeout for initial profile generation
-    timeout: 150
-    max_tokens: 700
+    # timeout: 150
+    # max_tokens: 700
   fake_candidate_resume:
     provider: local
-    timeout: 120
-    max_tokens: 400
+    # timeout: 120
+    # max_tokens: 400
