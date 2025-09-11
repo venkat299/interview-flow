@@ -22,6 +22,8 @@ async def test_run_interview_end_to_end(monkeypatch):
                 "overlap_skills": ["python"],
                 "primary_overlap_focus": "python",
             }
+        if task_name == "skill_tag_refinement":
+            return {"tags": []}
         if task_name == "stage_1_parse":
             if "project name" in system_prompt:
                 return {"project_name": "demo"}

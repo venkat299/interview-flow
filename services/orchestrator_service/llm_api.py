@@ -12,6 +12,7 @@ from .schemas import (
     VerificationResult,
 )
 from gateway_service import gateway
+from common.skill_inventory import SKILL_INVENTORY
 from interviewer_service.personas import PERSONA_PROMPTS
 from interviewer_service import LLMInterviewer
 from monitor_service import LLMMonitor
@@ -233,6 +234,23 @@ async def analyze_jd_resume(
         JDResumeAnalysisInput(jd_text=jd_text, resume_text=resume_text)
     )
 
+    canonical_tags = SKILL_INVENTORY.get(out.role_from_jd or "", [])
+    data = await gateway.execute_task(
+        task_name="skill_tag_refinement",
+        system_prompt=(
+            "Expand the provided canonical skill tags with additional related tags found in the job description and resume. "
+            "Respond with JSON {\"tags\": [string]}"
+        ),
+        user_prompt=(
+            f"Role: {out.role_from_jd}\n"
+            f"Canonical tags: {canonical_tags}\n"
+            f"Job description: {jd_text}\n"
+            f"Resume: {resume_text}"
+        ),
+    )
+    expanded_tags = data.get("tags", [])
+    merged_tags = list(dict.fromkeys(list(canonical_tags) + list(expanded_tags)))
+
     packet = ContextPacket(
         jd_text=jd_text,
         resume_text=resume_text,
@@ -242,6 +260,7 @@ async def analyze_jd_resume(
         resume_claims=out.resume_claims,
         overlap_skills=out.overlap_skills,
         primary_overlap_focus=out.primary_overlap_focus,
+        role_skill_tags=merged_tags,
     )
     packet.time_remaining_min = packet.duration_min
     return packet
@@ -382,6 +401,8 @@ async def evidence_skill_question(
     """Stage-2: Gather concrete responsibilities and skill hooks."""
 
     skills = packet.overlap_skills or packet.jd_core_skills
+    if packet.role_skill_tags:
+        skills = list(dict.fromkeys(list(packet.role_skill_tags) + list(skills)))
 
     if answer is None:
         skill_list = ", ".join(skills)
