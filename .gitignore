@@ -211,4 +211,5 @@ uv.lock
 extern/voices/*
 research/*
 
+services/session_service/question_logs.db
 services/sample_data_service/data/samples.db

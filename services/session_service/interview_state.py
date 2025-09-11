@@ -1,6 +1,6 @@
 """State management for stage-based interview sessions."""
 
-from typing import List
+from typing import List, Optional
 
 from orchestrator_service.schemas import ContextPacket
 
@@ -19,11 +19,22 @@ class InterviewState:
         "reflection",
     ]
 
-    def __init__(self, packet: ContextPacket) -> None:
+    def __init__(
+        self,
+        packet: ContextPacket,
+        session_id: Optional[str] = None,
+        candidate_id: Optional[str] = None,
+    ) -> None:
         self.packet = packet
         self.phase_index = 0
         # Stage-1 warm-up progresses through enumerated steps
         self.warmup_index = 0
+        # Metadata for logging
+        self.session_id = session_id
+        self.candidate_id = candidate_id
+        # Track the last question asked to pair with the next answer
+        self.last_question_text: Optional[str] = None
+        self.last_question_type: Optional[str] = None
 
     @property
     def current_phase(self) -> str:
