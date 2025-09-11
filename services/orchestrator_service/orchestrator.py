@@ -58,7 +58,3 @@ class Orchestrator:
     async def loop(self, state: Any, answer: Optional[str] = None) -> Optional[str]:
         """Return the next question string or None if the interview has ended."""
         return await self.decide_next_action(state, answer)
-
-    async def record_turn(self, turn: dict) -> None:  # pragma: no cover - placeholder
-        return None
-

@@ -70,7 +70,6 @@ class ReportPDF(FPDF):
             self.set_text_color(80, 80, 80)
             self.set_xy(self.l_margin, 8)
             self.set_font(self._font_bold, "B", 12)
-            y0 = self.get_y()
             self.multi_cell(usable_w, 6, self.header_title)
             y1 = self.get_y()
             self.set_draw_color(*self.accent)
