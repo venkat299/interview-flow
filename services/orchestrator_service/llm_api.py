@@ -247,12 +247,18 @@ async def warmup_overview(
     """Stage-1: Ask for a project overview and record goal and constraints."""
 
     if answer is None:
-        prompt = (
-            "Give me a 60–90 sec overview of a project most relevant to "
-            f"{packet.primary_overlap_focus}: goal, your role, key constraints."
+        system_prompt = (
+            "You are an AI technical interviewer. Generate a single warm-up question "
+            f"asking the candidate for a 60–90 second overview of a project most relevant to {packet.primary_overlap_focus}. "
+            f"The role is {packet.role_from_jd}. The question should solicit the project's goal, the candidate's role, and key constraints. "
+            "Respond ONLY with a single, valid JSON object with a single key 'question_text'."
+        )
+        data = await gateway.execute_task(
+            task_name="question_generation",
+            system_prompt=system_prompt,
         )
         _decrement_time(packet, 1)
-        return prompt
+        return data["question_text"]
 
     out = await _warmup_overview(WarmupOverviewInput(answer=answer))
     packet.project_context.goal = out.goal
@@ -266,12 +272,20 @@ async def warmup_constraint(
     """Stage-1: Ask about hardest constraint and capture scale/latency info."""
 
     if answer is None:
-        question = (
-            "What was the hardest constraint (scale, latency/SLA, reliability, cost) "
-            "and how did it shape your design?"
+        goal = packet.project_context.goal or "the project"
+        constraints = packet.project_context.constraints or ""
+        system_prompt = (
+            "You are an AI technical interviewer. Based on the candidate's project summary, generate a follow-up question about the most challenging constraint. "
+            f"The project goal was: {goal}. Noted constraints: {constraints}. "
+            "Ask which constraint (e.g., scale, latency/SLA, reliability, cost) was hardest and how it shaped the design. "
+            "Respond ONLY with a single, valid JSON object with a single key 'question_text'."
+        )
+        data = await gateway.execute_task(
+            task_name="question_generation",
+            system_prompt=system_prompt,
         )
         _decrement_time(packet, 1)
-        return question
+        return data["question_text"]
 
     out = await _warmup_constraint(WarmupConstraintInput(answer=answer))
     packet.project_context.scale_latency_slo = out.scale_latency_slo
@@ -287,14 +301,17 @@ async def evidence_skill_question(
 
     if answer is None:
         skill_list = ", ".join(skills)
-        question = (
-            "Name 2–3 components you directly built/owned. For each: purpose, "
-            "main interfaces, and your exact contribution. For the following "
-            f"skills, describe one task you completed and rate your confidence "
-            f"1–5: {skill_list}."
+        system_prompt = (
+            "You are an AI technical interviewer. Generate a question asking the candidate to name 2–3 components they directly built or owned, "
+            "including each component's purpose, main interfaces, and their exact contribution. Also ask them to describe one task completed and rate their confidence 1–5 for each of the following skills: "
+            f"{skill_list}. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
+        )
+        data = await gateway.execute_task(
+            task_name="question_generation",
+            system_prompt=system_prompt,
         )
         _decrement_time(packet, 4)
-        return question
+        return data["question_text"]
 
     out = await _evidence(EvidenceInput(answer=answer))
     packet.skill_hooks = out.skill_hooks
@@ -337,9 +354,17 @@ async def wrap_up(packet: ContextPacket, answer: Optional[str] = None) -> Option
     """Stage-4: Conclude the interview and capture a summary."""
 
     if answer is None:
-        question = "Any questions about the role, roadmap, or stack?"
+        notes = "; ".join(packet.notes)
+        system_prompt = (
+            "You are an AI technical interviewer wrapping up the conversation. Based on these notes from the interview, generate a final personalized question inviting the candidate to ask about the role, roadmap, stack, or anything else. "
+            f"Notes: {notes}. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
+        )
+        data = await gateway.execute_task(
+            task_name="question_generation",
+            system_prompt=system_prompt,
+        )
         _decrement_time(packet, 1)
-        return question
+        return data["question_text"]
 
     out = await _wrap_up(
         WrapUpInput(notes=packet.notes, verifications=packet.verifications)
