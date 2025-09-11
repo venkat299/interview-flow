@@ -1,8 +1,9 @@
-import os
 from pathlib import Path
 from typing import Any, Dict
 
 import yaml
+from pydantic import Field
+from pydantic_settings import BaseSettings
 
 
 def _load_router_config() -> Dict[str, Any]:
@@ -21,55 +22,38 @@ def _load_router_config() -> Dict[str, Any]:
 _ROUTER_CFG: Dict[str, Any] = _load_router_config()
 _PROVIDERS: Dict[str, Any] = _ROUTER_CFG.get("providers", {}) if isinstance(_ROUTER_CFG, dict) else {}
 _LOCAL_PROVIDER: Dict[str, Any] = _PROVIDERS.get("local", {}) if isinstance(_PROVIDERS, dict) else {}
-_LOCAL_BASE_URL_YAML: str = (_LOCAL_PROVIDER.get("base_url") or "") if isinstance(_LOCAL_PROVIDER, dict) else ""
-_LOCAL_MODEL_YAML: str = (_LOCAL_PROVIDER.get("model") or "openai/gpt-oss-20b") if isinstance(_LOCAL_PROVIDER, dict) else "openai/gpt-oss-20b"
+_LOCAL_BASE_URL_YAML: str = (
+    (_LOCAL_PROVIDER.get("base_url") or "") if isinstance(_LOCAL_PROVIDER, dict) else ""
+)
+_LOCAL_MODEL_YAML: str = (
+    (_LOCAL_PROVIDER.get("model") or "openai/gpt-oss-20b")
+    if isinstance(_LOCAL_PROVIDER, dict)
+    else "openai/gpt-oss-20b"
+)
 
 
-class Settings:
-    """Simplified settings for LLM configuration."""
+class Settings(BaseSettings):
+    """Settings powered by Pydantic for type-safe env access."""
 
-    # Which LLM backend to use: "openai" or "local"
-    llm_provider: str = os.getenv("LLM_PROVIDER", "local")
+    llm_provider: str = Field(default="local", alias="LLM_PROVIDER")
 
-    # API keys or URLs for the various providers
-    openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
-    # gpt-3.5-turbo
-    openai_model: str = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
+    openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
+    openai_model: str = Field(default="gpt-3.5-turbo", alias="OPENAI_MODEL")
 
-    # Model identifier for local OpenAI-compatible servers
-    # Prefer llm_router_config.yml, allow env override
-    local_model: str = os.getenv("LOCAL_LLM_MODEL", _LOCAL_MODEL_YAML)
-    gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
-    # Local OpenAI-compatible server URL; prefer llm_router_config.yml, allow env override
-    local_llm_url: str = os.getenv("LOCAL_LLM_URL", _LOCAL_BASE_URL_YAML)
+    local_model: str = Field(default=_LOCAL_MODEL_YAML, alias="LOCAL_LLM_MODEL")
+    gemini_api_key: str = Field(default="", alias="GEMINI_API_KEY")
+    local_llm_url: str = Field(default=_LOCAL_BASE_URL_YAML, alias="LOCAL_LLM_URL")
 
-    # --- Logging / Tracing configuration ---
-    # Standard log level: DEBUG, INFO, WARNING, ERROR, CRITICAL, or TRACE (custom)
-    log_level: str = os.getenv("LOG_LEVEL", "DEBUG")
+    log_level: str = Field(default="DEBUG", alias="LOG_LEVEL")
+    trace_calls: bool = Field(default=False, alias="TRACE_CALLS")
+    trace_module_prefixes: str = Field(default="", alias="TRACE_MODULE_PREFIXES")
+    trace_file_path_contains: str = Field(default="services/", alias="TRACE_FILE_PATH_CONTAINS")
+    trace_concise: bool = Field(default=False, alias="TRACE_CONCISE")
 
-    # Enable function call tracing across service modules (very verbose)
-    # You can enable this either by setting LOG_LEVEL=TRACE or TRACE_CALLS=true.
-    trace_calls: bool = os.getenv("TRACE_CALLS", "").strip().lower() in {"1", "true", "yes", "y"}
+    llm_timeout: float = Field(default=60.0, alias="LLM_TIMEOUT")
+    llm_connect_timeout: float = Field(default=10.0, alias="LLM_CONNECT_TIMEOUT")
 
-    # Comma-separated list of module prefixes to trace, e.g. "api_service,orchestrator_service"
-    # If empty, path-based filter will be used.
-    trace_module_prefixes: str = os.getenv("TRACE_MODULE_PREFIXES", "")
-
-    # Comma-separated substrings; any file path containing one of these will be traced.
-    # Defaults to tracing code under the repo's services directory.
-    trace_file_path_contains: str = os.getenv("TRACE_FILE_PATH_CONTAINS", "services/")
-
-    # Concise output for trace logs (message only: CALL/RET and function)
-    trace_concise: bool = os.getenv("TRACE_CONCISE", "").strip().lower() in {"1", "true", "yes", "y"}
-
-    # Timeout (in seconds) for outgoing HTTP requests to LLM providers
-    # Increase default read timeout to accommodate slower local models.
-    llm_timeout: float = float(os.getenv("LLM_TIMEOUT", "60"))
-    # Separate, shorter connect timeout is usually fine.
-    llm_connect_timeout: float = float(os.getenv("LLM_CONNECT_TIMEOUT", "10"))
-
-    # Path to local SQLite DB for sample resumes/job descriptions
-    samples_db_path: str = os.getenv("SAMPLES_DB_PATH", "data/samples.db")
+    samples_db_path: str = Field(default="data/samples.db", alias="SAMPLES_DB_PATH")
 
 
 settings = Settings()
