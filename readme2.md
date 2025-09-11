@@ -1,27 +1,29 @@
 # Repository Code Flow
 
-This project implements an AI-driven interview platform using FastAPI and modular services.
+The repository bundles several services that collaborate to run a conversational technical interview.
 
-## Backend Services
-- **Orchestrator**: Drives session pacing, selects actions, and logs turns.
-- **Interviewer**: Uses an LLM to phrase questions conversationally.
-- **Monitor**: Evaluates each turn for clarity and difficulty while tracking skill estimates.
-- **Scoring Engine**: Aggregates test outcomes and rubric scores into final results.
-- **Question Service**: Provides seed items and paraphrases stems for natural prompts.
-- **Sandbox Service**: Executes code and SQL snippets in isolated environments.
-- **Evidence & Verification**: Parses resumes and probes claims for truthfulness.
-- **Analytics & Guardrails**: Collects item metrics and filters unsafe content.
-- **Storage**: Persists transcripts, decisions, and reports.
+## Services
 
-## API Flow
-1. Clients initiate sessions via REST or WebSocket.
-2. The orchestrator builds an interview blueprint and dispatches the first question.
-3. Candidate responses are evaluated by sandboxes and scoring services.
-4. The monitor updates ability estimates and suggests the next topic.
-5. Sessions end with a summary score and stored transcript.
+- `orchestrator_service` – stage machine and prompt helpers
+- `session_service` – WebSocket manager and SQLite storage
+- `gateway_service` – routes LLM requests to configured providers
+- `interviewer_service`, `monitor_service`, `scoring_service` – optional modules for phrasing, diagnostics, and scoring
+- `api_service` – FastAPI entry point exposing REST and WebSocket APIs
 
-## Frontend
-A simple test client connects over WebSocket, displays questions, and shows final summaries.
+## Typical Flow
+
+1. Client connects to `/api/v1/ws/{session_id}`.
+2. `ConnectionManager` calls `llm_api.analyze_jd_resume` to build context.
+3. `Orchestrator.loop` returns questions and transitions stages.
+4. Answers are persisted and evaluated; monitoring and scoring can run per turn.
+5. When no more questions remain, the session ends and can be retrieved via REST.
 
 ## Testing
-Run `pytest` to execute the integration test covering the end-to-end flow.
+
+Run:
+
+```bash
+pytest
+```
+
+to execute the available tests.

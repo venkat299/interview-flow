@@ -1,9 +1,15 @@
 """Core AI interview utilities."""
 
 from typing import Dict, List, Optional
+import asyncio
+
+from langchain.chains import LLMChain
+from langchain.prompts import PromptTemplate
+from langchain.llms.base import LLM
 
 from .schemas import (
     InterviewRequest,
+    InterviewResponse,
     InterviewContext,
     InterviewBlueprintResponse,
     EvaluationRequest,
@@ -31,9 +37,10 @@ async def generate_introductory_question() -> str:
     data = await gateway.execute_task(
         task_name="question_generation",
         system_prompt=system_prompt,
+        response_model=InterviewResponse,
     )
 
-    return data["question_text"]
+    return data.question_text
 
 
 async def generate_soft_skill_question(candidate_resume: str) -> str:
@@ -49,9 +56,27 @@ async def generate_soft_skill_question(candidate_resume: str) -> str:
     data = await gateway.execute_task(
         task_name="question_generation",
         system_prompt=system_prompt,
+        response_model=InterviewResponse,
     )
 
-    return data["question_text"]
+    return data.question_text
+
+
+class GatewayLLM(LLM):
+    async def _acall(self, prompt: str, stop: Optional[List[str]] = None) -> str:
+        result = await gateway.execute_task(
+            task_name="question_generation",
+            system_prompt=prompt,
+            response_model=InterviewResponse,
+        )
+        return result.question_text
+
+    def _call(self, prompt: str, stop: Optional[List[str]] = None) -> str:
+        return asyncio.get_event_loop().run_until_complete(self._acall(prompt, stop))
+
+    @property
+    def _llm_type(self) -> str:  # pragma: no cover - simple property
+        return "gateway"
 
 
 async def generate_next_question(request: InterviewRequest) -> str:
@@ -60,12 +85,8 @@ async def generate_next_question(request: InterviewRequest) -> str:
 
     constraints = [
         f"Topic Focus: The question MUST be about '{request.current_topic}'.",
-        (
-            f"Difficulty Level: The question's complexity MUST match the target difficulty of {request.current_difficulty}/5."
-        ),
-        (
-            "Context: The question should be a logical follow-up to the existing conversation history. Do not repeat previous questions."
-        ),
+        f"Difficulty Level: The question's complexity MUST match the target difficulty of {request.current_difficulty}/5.",
+        "Context: The question should be a logical follow-up to the existing conversation history. Do not repeat previous questions.",
     ]
 
     if request.current_difficulty <= 2:
@@ -75,39 +96,35 @@ async def generate_next_question(request: InterviewRequest) -> str:
 
     if request.current_difficulty == 1:
         constraints.append(
-            "Question Type: Randomly choose one of the following formats: yes/no, multiple choice, or short-answer. "
-            "Include a 'question_type' key indicating the chosen format."
+            "Question Type: Randomly choose one of the following formats: yes/no, multiple choice, or short-answer. Include a 'question_type' key indicating the chosen format."
         )
 
     if request.needs_hint:
         constraints.append("Provide a subtle hint to guide the candidate within the question.")
 
-    numbered_constraints = "\n".join(
-        f"{idx + 1}.  {text}" for idx, text in enumerate(constraints)
-    )
-
-    system_prompt = (
-        f"{persona_prompt}\n\n"
-        "Your Task: Act as an AI technical interviewer. Generate the next single question for the candidate.\n\n"
-        f"Constraints:\n{numbered_constraints}\n\n"
-        "Respond ONLY with a single, valid JSON object with a single key 'question_text'"
-    )
-
-    if request.current_difficulty == 1:
-        system_prompt += " and an optional 'question_type' key."
-    else:
-        system_prompt += "."
+    numbered_constraints = "\n".join(f"{idx + 1}. {text}" for idx, text in enumerate(constraints))
 
     history_lines = [f"{turn.role}: {turn.message}" for turn in request.history]
-    user_prompt = "\n".join(history_lines)
 
-    data = await gateway.execute_task(
-        task_name="question_generation",
-        system_prompt=system_prompt,
-        user_prompt=user_prompt,
+    template = PromptTemplate(
+        input_variables=["persona", "constraints", "history", "suffix"],
+        template=(
+            "{persona}\n\n"
+            "Your Task: Act as an AI technical interviewer. Generate the next single question for the candidate.\n\n"
+            "Conversation so far:\n{history}\n\n"
+            "Constraints:\n{constraints}\n\n"
+            "Respond ONLY with a single, valid JSON object with a single key 'question_text'{suffix}"
+        ),
     )
 
-    return data["question_text"]
+    suffix = " and an optional 'question_type' key." if request.current_difficulty == 1 else "."
+    chain = LLMChain(llm=GatewayLLM(), prompt=template)
+    return await chain.apredict(
+        persona=persona_prompt,
+        constraints=numbered_constraints,
+        history="\n".join(history_lines),
+        suffix=suffix,
+    )
 
 
 async def create_interview_blueprint(context: InterviewContext) -> InterviewBlueprintResponse:
@@ -137,9 +154,10 @@ async def create_interview_blueprint(context: InterviewContext) -> InterviewBlue
         task_name="blueprint_generation",
         system_prompt=system_prompt,
         user_prompt=user_prompt,
+        response_model=InterviewBlueprintResponse,
     )
 
-    return InterviewBlueprintResponse.model_validate(data)
+    return data
 
 
 async def evaluate_candidate_answer(
@@ -169,9 +187,10 @@ async def evaluate_candidate_answer(
     data = await gateway.execute_task(
         task_name="answer_evaluation",
         system_prompt=system_prompt,
+        response_model=EvaluationResponse,
     )
 
-    return EvaluationResponse.model_validate(data)
+    return data
 
 
 async def generate_final_summary(performance_log: List[dict]) -> dict:

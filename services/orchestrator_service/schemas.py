@@ -32,6 +32,7 @@ class InterviewResponse(BaseModel):
     """Response model containing the generated question text."""
 
     question_text: str
+    question_type: Optional[str] = None
 
 
 class TopicBlueprint(BaseModel):

@@ -16,4 +16,5 @@ dependencies = [
     "logging>=0.4.9.6",
     "PyYAML>=6.0.2",
     "fpdf2>=2.7.0",
+    "langchain>=0.2.9",
 ]

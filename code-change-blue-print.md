@@ -1,73 +1,36 @@
-# Code Change Blueprint: AI Interviewer Alignment
+# Code Change Blueprint
 
-## Stage-Based Interview Flow
-- The interview now runs through distinct stages (0–4) driven by a shared
-  **Context Packet** capturing job description, resume details, skills, and
-  notes.
-- **Stage‑0** analyzes JD and resume to initialize the packet and timer.
-- **Stage‑1** warm-up collects project context via overview and constraint
-  questions.
-- **Stage‑2** gathers evidence, skill hooks, and confidence ratings.
-- **Stage‑3** verifies fundamentals for each hook.
-- **Stage‑4** wraps up with strengths, risks, and follow-ups, consuming
-  any remaining time.
-- Final assessment aggregates **Depth of reasoning**, **Trade-off analysis**,
-  **Fundamentals verified**, and **Clarity & precision** into a 10-point score
-  reflected in the web UI and PDF report.
+Guide for extending the stage‑based AI interviewer.
 
-## Step 1 – Orchestrator Service
-- **File**: `services/orchestrator_service/orchestrator.py`
-  - `class Orchestrator`
-    - `decide_next_action(state)` – choose ask / probe / switch topic / wrap.
-    - `loop(state, answer)` – advance stage machine and return next question.
-    - `record_turn(turn)` – hook for persistence (placeholder).
-- **File**: `services/orchestrator_service/__init__.py`
-  - Export `Orchestrator` for other services.
+## Stage Overview
 
-## Step 2 – WebSocket ConnectionManager
-- **File**: `services/session_service/service.py`
-  - `ConnectionManager` delegates stage flow to `Orchestrator`.
-  - On `join_session`, runs stage‑0 `analyze_jd_resume` and seeds SQLite via `database.py`.
-  - Emits `session_started`, `stage_changed`, `blueprint`, and `new_question` events.
+0. **Analysis** – parse job description and resume, seed timers.
+1. **Warm‑up** – gather project overview and constraints.
+2. **Evidence** – collect examples and confidence ratings.
+3. **Theory** – probe fundamentals for each skill hook.
+4. **Wrap‑up** – summarize strengths, risks, and follow‑ups.
 
-## Step 3 – LLM Interviewer Module
-- **File**: `services/interviewer_service/interviewer.py`
-  - `class LLMInterviewer`
-    - `next_question(context, item)` – placeholder paraphrasing.
-    - `warm_start(resume)` – rapport prompt.
-    - `wrap_up(state)` – closing prompt.
-- **File**: `services/interviewer_service/__init__.py`
+The final report aggregates reasoning depth, trade‑offs, fundamentals verified, and clarity into a 10‑point score.
 
-## Step 4 – LLM Monitor Module
-- **File**: `services/monitor_service/monitor.py`
-  - `class LLMMonitor`
-    - `assess_turn(state, question, answer)` – placeholder diagnostics.
-    - `suggest_next(state)` – placeholder recommendation.
-- **File**: `services/monitor_service/__init__.py`
+## Key Modules
 
-## Step 5 – Scoring Engine
-- **File**: `services/scoring_service/scoring_engine.py`
-  - `class ScoringEngine`
-    - `aggregate(result, tests, rubric)` – placeholder sub‑scores.
-    - `finalize(performance_log)` – placeholder final score.
-- **File**: `services/scoring_service/__init__.py`
+- **Orchestrator** (`services/orchestrator_service/orchestrator.py`)
+  - `decide_next_action`, `loop`, `record_turn`
+- **ConnectionManager** (`services/session_service/service.py`)
+  - runs Stage‑0 and delegates all turns to the orchestrator
+- **LLM Interviewer** (`services/interviewer_service/interviewer.py`)
+  - `next_question`, `warm_start`, `wrap_up`
+- **LLM Monitor** (`services/monitor_service/monitor.py`)
+  - `assess_turn`, `suggest_next`
+- **ScoringEngine** (`services/scoring_service/scoring_engine.py`)
+  - `aggregate`, `finalize`
+- **LLM Helpers** (`services/orchestrator_service/llm_api.py`)
+  - Stage helpers such as `analyze_jd_resume`, `warmup_overview`, `evidence_skill_question`, `theory_check_question`, `wrap_up`
+  - REST helpers `generate_next_question`, `create_interview_blueprint`, `evaluate_candidate_answer`
 
-## Step 6 – LLM API Helpers
-- **File**: `services/orchestrator_service/llm_api.py`
-  - Stage helpers: `analyze_jd_resume`, `warmup_overview`, `warmup_constraint`, `evidence_skill_question`, `theory_check_question`, `wrap_up`.
-  - REST helpers: `generate_next_question`, `create_interview_blueprint`, `evaluate_candidate_answer`.
-  - Hooks: `on_question_selected`, `on_answer_scored` (wire Interviewer, Monitor, Scoring).
+## Development Notes
 
-## Step 7 – Orchestration Loop Integration
-- **File**: `services/orchestrator_service/orchestrator.py`
-  - Implements the stage loop.
-- **File**: `services/session_service/service.py`
-  - Uses `Orchestrator.loop()` for each interaction.
-- **File**: `services/api_service/app/main.py`
-  - Exposes REST endpoints and the WebSocket endpoint.
-
-## Step 8 – Performance & Modularity Notes
-- Adopt async I/O in all service methods to maximize concurrency.
+- Keep service functions async to maximize concurrency.
 - Use dependency injection to swap LLM providers or sandboxes.
-- Cache question bank & model prompts to reduce latency.
-- Separate services enable horizontal scaling via containers or workers.
+- Cache prompts or question banks to reduce latency.
+- Services can scale horizontally in separate containers.
