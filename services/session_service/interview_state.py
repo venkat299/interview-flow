@@ -18,6 +18,13 @@ class InterviewState:
         "outcome",
         "reflection",
     ]
+    evidence_steps: List[str] = [
+        "components",
+        "skill_task",
+    ]
+    wrapup_steps: List[str] = [
+        "closure",
+    ]
 
     def __init__(
         self,
@@ -27,14 +34,16 @@ class InterviewState:
     ) -> None:
         self.packet = packet
         self.phase_index = 0
-        # Stage-1 warm-up progresses through enumerated steps
+        # Stage-based step indexes
         self.warmup_index = 0
+
         # Metadata for logging
         self.session_id = session_id
         self.candidate_id = candidate_id
         # Track the last question asked to pair with the next answer
         self.last_question_text: Optional[str] = None
         self.last_question_type: Optional[str] = None
+
 
     @property
     def current_phase(self) -> str:
@@ -54,6 +63,28 @@ class InterviewState:
             self.warmup_index += 1
         else:
             # No more warm-up steps; advance to next phase
+            self.advance_phase()
+
+    @property
+    def current_evidence_step(self) -> str:
+        return self.evidence_steps[self.evidence_index]
+
+    def advance_evidence_step(self) -> None:
+        if self.evidence_index < len(self.evidence_steps) - 1:
+            self.evidence_index += 1
+        else:
+            self.evidence_index += 1
+            self.advance_phase()
+
+    @property
+    def current_wrapup_step(self) -> str:
+        return self.wrapup_steps[self.wrapup_index]
+
+    def advance_wrapup_step(self) -> None:
+        if self.wrapup_index < len(self.wrapup_steps) - 1:
+            self.wrapup_index += 1
+        else:
+            self.wrapup_index += 1
             self.advance_phase()
 
     def decrement_time(self, minutes: int) -> None:

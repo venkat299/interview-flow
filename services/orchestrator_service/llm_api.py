@@ -395,10 +395,31 @@ async def warmup_reflection(
     return None
 
 
-async def evidence_skill_question(
+async def evidence_components(
     packet: ContextPacket, answer: Optional[str] = None
-) -> Optional[str]:
-    """Stage-2: Gather concrete responsibilities and skill hooks."""
+) -> Optional[dict]:
+    """Stage-2 step: ask about project components owned."""
+
+    if answer is None:
+        system_prompt = (
+            "You are an AI technical interviewer. Ask the candidate to briefly list 2–3 major components they built or owned on the selected project, "
+            "including each component's purpose and main interfaces. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
+        )
+        data = await gateway.execute_task(
+            task_name="question_generation",
+            system_prompt=system_prompt,
+        )
+        _decrement_time(packet, 2)
+        return {"question_text": data["question_text"], "question_type": "evidence_components"}
+
+    packet.notes.append(f"Components: {answer}")
+    return None
+
+
+async def evidence_skill_task(
+    packet: ContextPacket, answer: Optional[str] = None
+) -> Optional[dict]:
+    """Stage-2 step: gather skill confidence from a task description."""
 
     skills = packet.overlap_skills or packet.jd_core_skills
     if packet.role_skill_tags:
@@ -407,16 +428,15 @@ async def evidence_skill_question(
     if answer is None:
         skill_list = ", ".join(skills)
         system_prompt = (
-            "You are an AI technical interviewer. Generate a question asking the candidate to name 2–3 components they directly built or owned, "
-            "including each component's purpose, main interfaces, and their exact contribution. Also ask them to describe one task completed and rate their confidence 1–5 for each of the following skills: "
+            "You are an AI technical interviewer. Ask the candidate to describe one concrete task they completed and to rate their confidence (1-5) for each of these skills: "
             f"{skill_list}. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
         )
         data = await gateway.execute_task(
             task_name="question_generation",
             system_prompt=system_prompt,
         )
-        _decrement_time(packet, 4)
-        return data["question_text"]
+        _decrement_time(packet, 2)
+        return {"question_text": data["question_text"], "question_type": "evidence_skill_task"}
 
     out = await _evidence(EvidenceInput(answer=answer))
     packet.skill_hooks = out.skill_hooks
@@ -455,8 +475,10 @@ async def theory_check_question(
     return None
 
 
-async def wrap_up(packet: ContextPacket, answer: Optional[str] = None) -> Optional[str]:
-    """Stage-4: Conclude the interview and capture a summary."""
+async def wrapup_closure(
+    packet: ContextPacket, answer: Optional[str] = None
+) -> Optional[dict]:
+    """Stage-4 step: invite final questions and capture summary."""
 
     if answer is None:
         notes = "; ".join(packet.notes)
@@ -469,7 +491,7 @@ async def wrap_up(packet: ContextPacket, answer: Optional[str] = None) -> Option
             system_prompt=system_prompt,
         )
         _decrement_time(packet, 1)
-        return data["question_text"]
+        return {"question_text": data["question_text"], "question_type": "wrapup_closure"}
 
     out = await _wrap_up(
         WrapUpInput(notes=packet.notes, verifications=packet.verifications)

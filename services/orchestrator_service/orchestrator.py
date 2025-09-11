@@ -10,9 +10,10 @@ from .llm_api import (
     warmup_challenge,
     warmup_outcome,
     warmup_reflection,
-    evidence_skill_question,
+    evidence_components,
+    evidence_skill_task,
     theory_check_question,
-    wrap_up,
+    wrapup_closure,
 )
 from session_service.question_log_db import log_question_response
 
@@ -55,6 +56,7 @@ class Orchestrator:
             return q
 
         if phase == "evidence":
+
             if answer is not None and getattr(state, "last_question_text", None):
                 log_question_response(
                     stage=phase,
@@ -65,12 +67,14 @@ class Orchestrator:
                     candidate_id=getattr(state, "candidate_id", None),
                 )
             q = await evidence_skill_question(packet, answer)
+
             if q is None:
-                state.advance_phase()
+                state.advance_evidence_step()
                 return await self.decide_next_action(state, None)
             state.last_question_text = q
             state.last_question_type = "evidence_skill"
             return {"question_text": q, "question_type": "evidence_skill"}
+
 
         if phase == "theory":
             if answer is not None and getattr(state, "last_question_text", None):
@@ -107,6 +111,7 @@ class Orchestrator:
             state.last_question_text = q
             state.last_question_type = "wrap_up"
             return {"question_text": q, "question_type": "wrap_up"}
+
 
         return None
 
