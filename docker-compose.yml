@@ -14,6 +14,9 @@ services:
       TRACE_FILE_PATH_CONTAINS: services/
       # Print concise trace lines (CALL/RET only)
       TRACE_CONCISE: "true"
+      # Allow more time for slow local LLMs
+      LLM_TIMEOUT: "120"
+      LLM_CONNECT_TIMEOUT: "20"
     ports:
       - "8003:8000"
     volumes:

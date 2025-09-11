@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+import httpx
 from fastapi.middleware.cors import CORSMiddleware
 
 # Initialize logging/tracing as early as possible
@@ -119,6 +120,12 @@ async def generate_candidate(job_id: int):
         return await generate_candidate_for_job(job_id)
     except ValueError:
         raise HTTPException(status_code=404, detail="Job not found")
+    except httpx.TimeoutException:
+        # Surface LLM/network timeouts as a 504 to the client
+        raise HTTPException(status_code=504, detail="LLM gateway timeout")
+    except httpx.HTTPError as e:
+        # Other upstream gateway errors
+        raise HTTPException(status_code=502, detail=f"LLM gateway error: {str(e)}")
 
 
 @app.post("/api/v1/sessions/{session_id}/auto-answer")

@@ -102,16 +102,33 @@ class AIGateway:
             messages.append({"role": "user", "content": user_prompt})
 
         payload: Dict[str, Any] = {"model": model, "messages": messages}
+        # Optional generation controls from YAML: task overrides provider
+        # Common OpenAI-compatible params: max_tokens, temperature, top_p, n, stop
+        for key in ("max_tokens", "temperature", "top_p", "n", "stop", "response_format"):
+            if isinstance((task_cfg or {}).get(key), (int, float, str, list, dict)):
+                payload[key] = (task_cfg or {}).get(key)
+            elif isinstance((provider_cfg or {}).get(key), (int, float, str, list, dict)) and key not in payload:
+                payload[key] = (provider_cfg or {}).get(key)
         headers: Dict[str, str] = {}
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
 
         client = self._get_client(provider_name)
+        # Allow per-task/provider timeout override (seconds)
+        read_to = settings.llm_timeout
+        connect_to = settings.llm_connect_timeout
+        try:
+            if isinstance((provider_cfg or {}).get("timeout"), (int, float)):
+                read_to = float(provider_cfg.get("timeout"))
+            if isinstance((task_cfg or {}).get("timeout"), (int, float)):
+                read_to = float(task_cfg.get("timeout"))
+        except Exception:
+            pass
         req_timeout = httpx.Timeout(
-            connect=settings.llm_connect_timeout,
-            read=settings.llm_timeout,
-            write=settings.llm_timeout,
-            pool=settings.llm_timeout,
+            connect=connect_to,
+            read=read_to,
+            write=read_to,
+            pool=read_to,
         )
         response = await client.post(url, headers=headers, json=payload, timeout=req_timeout)
         response.raise_for_status()
