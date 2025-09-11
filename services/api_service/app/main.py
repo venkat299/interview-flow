@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # Initialize logging/tracing as early as possible
 from gateway_service.config import settings
+from gateway_service import gateway as llm_gateway
 from common.logging_config import setup_from_settings
 
 setup_from_settings(settings)
@@ -40,6 +41,8 @@ async def lifespan(app: FastAPI):
     # Startup
     samples.init_db()
     samples.seed_if_empty()
+    # Verify LLM connectivity; abort startup if failing
+    await llm_gateway.health_check_active_providers()
     yield
     # Shutdown (nothing to cleanup currently)
 

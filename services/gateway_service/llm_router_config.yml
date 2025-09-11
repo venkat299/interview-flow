@@ -19,14 +19,14 @@ providers:
     model: openai/gpt-oss-20b
     # Optional generation controls (disabled by request)
     # max_tokens: 512
-    temperature: 0.7
+    temperature: 1.0
     # timeout: 120
 
   # Optional: keep OpenAI config for fallback/manual switching
-  openai:
-    base_url: https://api.openai.com/v1/chat/completions
-    api_key: dummy-key
-    model: gpt-3.5-turbo
+  # openai:
+  #   base_url: https://api.openai.com/v1/chat/completions
+  #   api_key: dummy-key
+  #   model: gpt-3.5-turbo
 
 tasks:
   blueprint_generation:

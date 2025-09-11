@@ -65,6 +65,66 @@ class AIGateway:
             self._clients[provider] = httpx.AsyncClient(timeout=None)
         return self._clients[provider]
 
+    async def _ping_provider(self, provider_name: str, *, connect_timeout: float = 5.0, read_timeout: float = 15.0) -> None:
+        """Send a minimal chat request to verify provider connectivity.
+
+        Raises an exception on failure.
+        """
+        tasks = self.config.get("tasks", {})
+        providers = self.config.get("providers", {})
+
+        yaml_provider_cfg = providers.get(provider_name) or {}
+        default_provider_cfg = self._provider_from_settings(provider_name)
+        provider_cfg: Dict[str, Optional[str]] = {**default_provider_cfg, **yaml_provider_cfg}
+
+        model = provider_cfg.get("model")
+        url = provider_cfg.get("base_url")
+        api_key = provider_cfg.get("api_key")
+        if not url or not model:
+            raise RuntimeError(f"Provider '{provider_name}' missing url/model configuration")
+
+        headers: Dict[str, str] = {}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+
+        payload: Dict[str, Any] = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": "healthcheck"},
+                {"role": "user", "content": "ping"},
+            ],
+        }
+
+        client = self._get_client(provider_name)
+        timeout = httpx.Timeout(connect=connect_timeout, read=read_timeout, write=read_timeout, pool=read_timeout)
+        resp = await client.post(url, headers=headers, json=payload, timeout=timeout)
+        resp.raise_for_status()
+        # Ensure JSON body is returned
+        _ = resp.json()
+
+    async def health_check_active_providers(self) -> None:
+        """Check connectivity for providers used by tasks and default provider.
+
+        Raises RuntimeError if any provider fails.
+        """
+        tasks = self.config.get("tasks", {})
+        # Providers explicitly referenced by tasks (fallback to default provider if missing)
+        provs = { (settings.llm_provider or "local").lower() }
+        for tconf in (tasks.values() if isinstance(tasks, dict) else []):
+            if isinstance(tconf, dict):
+                name = (tconf.get("provider") or settings.llm_provider or "local").lower()
+                provs.add(name)
+
+        errors: list[str] = []
+        for name in provs:
+            try:
+                await self._ping_provider(name)
+            except Exception as e:
+                errors.append(f"{name}: {e}")
+
+        if errors:
+            raise RuntimeError("LLM connectivity check failed for: " + ", ".join(errors))
+
     async def execute_task(self, task_name: str, system_prompt: str, user_prompt: Optional[str] = None) -> Any:
         """Execute a task by routing it to the configured LLM provider.
 
