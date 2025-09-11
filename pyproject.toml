@@ -12,7 +12,6 @@ dependencies = [
     "pydantic-settings>=2.10.1",
     "python-dotenv>=1.0.1",
     "uvicorn>=0.35.0",
-    "logging>=0.4.9.6",
     "PyYAML>=6.0.2",
     "fpdf2>=2.7.0",
     "dspy-ai>=3.0.0",

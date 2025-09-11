@@ -16,11 +16,19 @@ with open('/tmp/pyproject.toml', 'rb') as f:
     deps = tomllib.load(f)['project']['dependencies']
 pathlib.Path('/tmp/requirements.txt').write_text('\n'.join(deps))
 PY
-RUN pip install --no-cache-dir -r /tmp/requirements.txt
-# Install a Unicode TrueType font (DejaVu) for PDF generation
+# Install system build tools (for Rust-based wheels) and fonts
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends fonts-dejavu-core \
+    && apt-get install -y --no-install-recommends \
+       build-essential \
+        cargo \
+        pkg-config \
+        libssl-dev \
+        fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
+
+# Upgrade packaging tools and install Python deps (prefer wheels)
+RUN pip install --no-cache-dir -U pip setuptools wheel \
+    && pip install --no-cache-dir --prefer-binary -r /tmp/requirements.txt
 RUN rm /tmp/requirements.txt /tmp/pyproject.toml
 
 # Copy the entire source tree so orchestrator and helper services are available
