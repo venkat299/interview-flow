@@ -66,14 +66,19 @@ class Orchestrator:
                     session_id=getattr(state, "session_id", None),
                     candidate_id=getattr(state, "candidate_id", None),
                 )
-            q = await evidence_skill_question(packet, answer)
+            step = state.current_evidence_step
+            func_map = {
+                "components": evidence_components,
+                "skill_task": evidence_skill_task,
+            }
+            q = await func_map[step](packet, answer)
 
             if q is None:
                 state.advance_evidence_step()
                 return await self.decide_next_action(state, None)
-            state.last_question_text = q
-            state.last_question_type = "evidence_skill"
-            return {"question_text": q, "question_type": "evidence_skill"}
+            state.last_question_text = q.get("question_text")
+            state.last_question_type = q.get("question_type")
+            return q
 
 
         if phase == "theory":
@@ -104,13 +109,13 @@ class Orchestrator:
                     session_id=getattr(state, "session_id", None),
                     candidate_id=getattr(state, "candidate_id", None),
                 )
-            q = await wrap_up(packet, answer)
+            q = await wrapup_closure(packet, answer)
             if q is None:
                 state.advance_phase()
                 return None
-            state.last_question_text = q
-            state.last_question_type = "wrap_up"
-            return {"question_text": q, "question_type": "wrap_up"}
+            state.last_question_text = q.get("question_text")
+            state.last_question_type = q.get("question_type")
+            return q
 
 
         return None
