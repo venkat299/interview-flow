@@ -10,9 +10,10 @@ from .llm_api import (
     warmup_challenge,
     warmup_outcome,
     warmup_reflection,
-    evidence_skill_question,
+    evidence_components,
+    evidence_skill_task,
     theory_check_question,
-    wrap_up,
+    wrapup_closure,
 )
 
 
@@ -43,11 +44,16 @@ class Orchestrator:
             return q
 
         if phase == "evidence":
-            q = await evidence_skill_question(packet, answer)
+            step = state.current_evidence_step
+            func_map = {
+                "components": evidence_components,
+                "skill_task": evidence_skill_task,
+            }
+            q = await func_map[step](packet, answer)
             if q is None:
-                state.advance_phase()
+                state.advance_evidence_step()
                 return await self.decide_next_action(state, None)
-            return {"question_text": q, "question_type": "evidence_skill"}
+            return q
 
         if phase == "theory":
             q = await theory_check_question(packet, answer)
@@ -57,11 +63,15 @@ class Orchestrator:
             return {"question_text": q, "question_type": "theory_check"}
 
         if phase == "wrap_up":
-            q = await wrap_up(packet, answer)
-            if q is None:
-                state.advance_phase()
+            if state.wrapup_index >= len(state.wrapup_steps):
                 return None
-            return {"question_text": q, "question_type": "wrap_up"}
+            step = state.current_wrapup_step
+            func_map = {"closure": wrapup_closure}
+            q = await func_map[step](packet, answer)
+            if q is None:
+                state.advance_wrapup_step()
+                return await self.decide_next_action(state, None)
+            return q
 
         return None
 
