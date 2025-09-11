@@ -20,12 +20,6 @@ from .programs.stage0_analysis import (
     Stage0AnalysisProgram,
     JDResumeAnalysisInput,
 )
-from .programs.stage1_warmup import (
-    WarmupOverviewProgram,
-    WarmupOverviewInput,
-    WarmupConstraintProgram,
-    WarmupConstraintInput,
-)
 from .programs.stage2_evidence import (
     EvidenceProgram,
     EvidenceInput,
@@ -201,8 +195,6 @@ _interviewer = LLMInterviewer()
 _monitor = LLMMonitor()
 _scoring = ScoringEngine()
 _stage0 = Stage0AnalysisProgram()
-_warmup_overview = WarmupOverviewProgram()
-_warmup_constraint = WarmupConstraintProgram()
 _evidence = EvidenceProgram()
 _theory_question = TheoryQuestionProgram()
 _theory_eval = TheoryEvalProgram()
@@ -239,40 +231,160 @@ async def analyze_jd_resume(
     return packet
 
 
-async def warmup_overview(
+async def warmup_select_project(
     packet: ContextPacket, answer: Optional[str] = None
-) -> Optional[str]:
-    """Stage-1: Ask for a project overview and record goal and constraints."""
-
-    if answer is None:
-        prompt = (
-            "Give me a 60–90 sec overview of a project most relevant to "
-            f"{packet.primary_overlap_focus}: goal, your role, key constraints."
-        )
-        _decrement_time(packet, 1)
-        return prompt
-
-    out = await _warmup_overview(WarmupOverviewInput(answer=answer))
-    packet.project_context.goal = out.goal
-    packet.project_context.constraints = out.constraints
-    return None
-
-
-async def warmup_constraint(
-    packet: ContextPacket, answer: Optional[str] = None
-) -> Optional[str]:
-    """Stage-1: Ask about hardest constraint and capture scale/latency info."""
+) -> Optional[dict]:
+    """Warm-up step: have the candidate pick a project."""
 
     if answer is None:
         question = (
-            "What was the hardest constraint (scale, latency/SLA, reliability, cost) "
-            "and how did it shape your design?"
+            "Name the project most relevant to "
+            f"{packet.primary_overlap_focus}. Reply with the project name only."
         )
         _decrement_time(packet, 1)
-        return question
+        return {"question_text": question, "question_type": "warmup_project"}
 
-    out = await _warmup_constraint(WarmupConstraintInput(answer=answer))
-    packet.project_context.scale_latency_slo = out.scale_latency_slo
+    data = await gateway.execute_task(
+        task_name="stage_1_parse",
+        system_prompt='Extract the project name. Respond with JSON {"project_name": string}.',
+        user_prompt=answer,
+    )
+    packet.selected_project = data.get("project_name")
+    return None
+
+
+async def warmup_role_context(
+    packet: ContextPacket, answer: Optional[str] = None
+) -> Optional[dict]:
+    """Warm-up step: capture role and team size."""
+
+    if answer is None:
+        question = (
+            f"In one sentence, what was your role and team size on {packet.selected_project}? "
+            "Be concise."
+        )
+        _decrement_time(packet, 1)
+        return {"question_text": question, "question_type": "warmup_role"}
+
+    data = await gateway.execute_task(
+        task_name="stage_1_parse",
+        system_prompt=(
+            'Extract role and team_size. Respond with JSON {"role": string, "team_size": string}.'
+        ),
+        user_prompt=answer,
+    )
+    packet.project_context.role = data.get("role")
+    packet.project_context.team_size = data.get("team_size")
+    return None
+
+
+async def warmup_architecture(
+    packet: ContextPacket, answer: Optional[str] = None
+) -> Optional[dict]:
+    """Warm-up step: high-level architecture and technologies."""
+
+    if answer is None:
+        question = (
+            "Briefly describe the high-level architecture and key technologies. "
+            "Answer in one sentence."
+        )
+        _decrement_time(packet, 1)
+        return {"question_text": question, "question_type": "warmup_architecture"}
+
+    data = await gateway.execute_task(
+        task_name="stage_1_parse",
+        system_prompt=(
+            'Extract architecture and key_technologies (list). Respond with JSON {"architecture": string, "key_technologies": [string]}.'
+        ),
+        user_prompt=answer,
+    )
+    packet.project_context.architecture = data.get("architecture")
+    packet.project_context.key_technologies = data.get("key_technologies", [])
+    return None
+
+
+async def warmup_constraints(
+    packet: ContextPacket, answer: Optional[str] = None
+) -> Optional[dict]:
+    """Warm-up step: capture key constraints."""
+
+    if answer is None:
+        question = (
+            "List the main technical constraints you faced (e.g., scale, latency). "
+            "Keep it short."
+        )
+        _decrement_time(packet, 1)
+        return {"question_text": question, "question_type": "warmup_constraints"}
+
+    data = await gateway.execute_task(
+        task_name="stage_1_parse",
+        system_prompt='Extract constraints as a list. Respond with JSON {"constraints": [string]}.',
+        user_prompt=answer,
+    )
+    packet.project_context.constraints = data.get("constraints", [])
+    return None
+
+
+async def warmup_challenge(
+    packet: ContextPacket, answer: Optional[str] = None
+) -> Optional[dict]:
+    """Warm-up step: hardest challenge faced."""
+
+    if answer is None:
+        question = (
+            "What was the toughest technical challenge and how did you address it? One sentence."
+        )
+        _decrement_time(packet, 1)
+        return {"question_text": question, "question_type": "warmup_challenge"}
+
+    data = await gateway.execute_task(
+        task_name="stage_1_parse",
+        system_prompt='Extract the challenge. Respond with JSON {"challenge": string}.',
+        user_prompt=answer,
+    )
+    packet.project_context.challenge = data.get("challenge")
+    return None
+
+
+async def warmup_outcome(
+    packet: ContextPacket, answer: Optional[str] = None
+) -> Optional[dict]:
+    """Warm-up step: outcomes or metrics achieved."""
+
+    if answer is None:
+        question = (
+            "What measurable outcome or metric did the project achieve? One sentence."
+        )
+        _decrement_time(packet, 1)
+        return {"question_text": question, "question_type": "warmup_outcome"}
+
+    data = await gateway.execute_task(
+        task_name="stage_1_parse",
+        system_prompt='Extract the outcome or metrics. Respond with JSON {"outcome": string}.',
+        user_prompt=answer,
+    )
+    packet.project_context.outcome = data.get("outcome")
+    return None
+
+
+async def warmup_reflection(
+    packet: ContextPacket, answer: Optional[str] = None
+) -> Optional[dict]:
+    """Warm-up step: reflection or lessons learned."""
+
+    if answer is None:
+        question = (
+            "Looking back, what would you improve or do differently? One sentence."
+        )
+        _decrement_time(packet, 1)
+        return {"question_text": question, "question_type": "warmup_reflection"}
+
+    data = await gateway.execute_task(
+        task_name="stage_1_parse",
+        system_prompt='Extract reflection. Respond with JSON {"reflection": string}.',
+        user_prompt=answer,
+    )
+    packet.project_context.reflection = data.get("reflection")
     return None
 
 

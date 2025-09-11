@@ -3,8 +3,13 @@
 from typing import Any, Optional
 
 from .llm_api import (
-    warmup_overview,
-    warmup_constraint,
+    warmup_select_project,
+    warmup_role_context,
+    warmup_architecture,
+    warmup_constraints,
+    warmup_challenge,
+    warmup_outcome,
+    warmup_reflection,
     evidence_skill_question,
     theory_check_question,
     wrap_up,
@@ -16,20 +21,24 @@ class Orchestrator:
 
     async def decide_next_action(
         self, state: Any, answer: Optional[str] = None
-    ) -> Optional[str]:
+    ) -> Optional[dict]:
         packet = state.packet
         phase = state.current_phase
 
         if phase == "warm_up":
-            if state.warmup_step == 0:
-                q = await warmup_overview(packet, answer)
-                if q is None:
-                    state.warmup_step = 1
-                    return await self.decide_next_action(state, None)
-                return q
-            q = await warmup_constraint(packet, answer)
+            step = state.current_warmup_step
+            func_map = {
+                "select_project": warmup_select_project,
+                "role_context": warmup_role_context,
+                "architecture": warmup_architecture,
+                "constraints": warmup_constraints,
+                "challenge": warmup_challenge,
+                "outcome": warmup_outcome,
+                "reflection": warmup_reflection,
+            }
+            q = await func_map[step](packet, answer)
             if q is None:
-                state.advance_phase()
+                state.advance_warmup_step()
                 return await self.decide_next_action(state, None)
             return q
 
@@ -38,23 +47,24 @@ class Orchestrator:
             if q is None:
                 state.advance_phase()
                 return await self.decide_next_action(state, None)
-            return q
+            return {"question_text": q, "question_type": "evidence_skill"}
 
         if phase == "theory":
             q = await theory_check_question(packet, answer)
             if q is None:
                 state.advance_phase()
                 return await self.decide_next_action(state, None)
-            return q
+            return {"question_text": q, "question_type": "theory_check"}
 
         if phase == "wrap_up":
             q = await wrap_up(packet, answer)
             if q is None:
                 state.advance_phase()
-            return q
+                return None
+            return {"question_text": q, "question_type": "wrap_up"}
 
         return None
 
-    async def loop(self, state: Any, answer: Optional[str] = None) -> Optional[str]:
-        """Return the next question string or None if the interview has ended."""
+    async def loop(self, state: Any, answer: Optional[str] = None) -> Optional[dict]:
+        """Return the next question payload or None if the interview has ended."""
         return await self.decide_next_action(state, answer)
