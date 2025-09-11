@@ -20,6 +20,20 @@ from .programs.stage0_analysis import (
     Stage0AnalysisProgram,
     JDResumeAnalysisInput,
 )
+from .programs.stage1_warmup import (
+    WarmupRoleProgram,
+    WarmupRoleInput,
+    WarmupArchitectureProgram,
+    WarmupArchitectureInput,
+    WarmupConstraintsProgram,
+    WarmupConstraintsInput,
+    WarmupChallengeProgram,
+    WarmupChallengeInput,
+    WarmupOutcomeProgram,
+    WarmupOutcomeInput,
+    WarmupReflectionProgram,
+    WarmupReflectionInput,
+)
 from .programs.stage2_evidence import (
     EvidenceProgram,
     EvidenceInput,
@@ -268,15 +282,9 @@ async def warmup_role_context(
         _decrement_time(packet, 1)
         return {"question_text": question, "question_type": "warmup_role"}
 
-    data = await gateway.execute_task(
-        task_name="stage_1_parse",
-        system_prompt=(
-            'Extract role and team_size. Respond with JSON {"role": string, "team_size": string}.'
-        ),
-        user_prompt=answer,
-    )
-    packet.project_context.role = data.get("role")
-    packet.project_context.team_size = data.get("team_size")
+    data = await WarmupRoleProgram()(WarmupRoleInput(answer=answer))
+    packet.project_context.role = data.role
+    packet.project_context.team_size = data.team_size
     return None
 
 
@@ -293,15 +301,9 @@ async def warmup_architecture(
         _decrement_time(packet, 1)
         return {"question_text": question, "question_type": "warmup_architecture"}
 
-    data = await gateway.execute_task(
-        task_name="stage_1_parse",
-        system_prompt=(
-            'Extract architecture and key_technologies (list). Respond with JSON {"architecture": string, "key_technologies": [string]}.'
-        ),
-        user_prompt=answer,
-    )
-    packet.project_context.architecture = data.get("architecture")
-    packet.project_context.key_technologies = data.get("key_technologies", [])
+    data = await WarmupArchitectureProgram()(WarmupArchitectureInput(answer=answer))
+    packet.project_context.architecture = data.architecture
+    packet.project_context.key_technologies = data.key_technologies
     return None
 
 
@@ -318,12 +320,8 @@ async def warmup_constraints(
         _decrement_time(packet, 1)
         return {"question_text": question, "question_type": "warmup_constraints"}
 
-    data = await gateway.execute_task(
-        task_name="stage_1_parse",
-        system_prompt='Extract constraints as a list. Respond with JSON {"constraints": [string]}.',
-        user_prompt=answer,
-    )
-    packet.project_context.constraints = data.get("constraints", [])
+    data = await WarmupConstraintsProgram()(WarmupConstraintsInput(answer=answer))
+    packet.project_context.constraints = data.constraints
     return None
 
 
@@ -339,12 +337,8 @@ async def warmup_challenge(
         _decrement_time(packet, 1)
         return {"question_text": question, "question_type": "warmup_challenge"}
 
-    data = await gateway.execute_task(
-        task_name="stage_1_parse",
-        system_prompt='Extract the challenge. Respond with JSON {"challenge": string}.',
-        user_prompt=answer,
-    )
-    packet.project_context.challenge = data.get("challenge")
+    data = await WarmupChallengeProgram()(WarmupChallengeInput(answer=answer))
+    packet.project_context.hardest_challenge = data.hardest_challenge
     return None
 
 
@@ -360,12 +354,8 @@ async def warmup_outcome(
         _decrement_time(packet, 1)
         return {"question_text": question, "question_type": "warmup_outcome"}
 
-    data = await gateway.execute_task(
-        task_name="stage_1_parse",
-        system_prompt='Extract the outcome or metrics. Respond with JSON {"outcome": string}.',
-        user_prompt=answer,
-    )
-    packet.project_context.outcome = data.get("outcome")
+    data = await WarmupOutcomeProgram()(WarmupOutcomeInput(answer=answer))
+    packet.project_context.outcomes = data.outcomes
     return None
 
 
@@ -381,12 +371,8 @@ async def warmup_reflection(
         _decrement_time(packet, 1)
         return {"question_text": question, "question_type": "warmup_reflection"}
 
-    data = await gateway.execute_task(
-        task_name="stage_1_parse",
-        system_prompt='Extract reflection. Respond with JSON {"reflection": string}.',
-        user_prompt=answer,
-    )
-    packet.project_context.reflection = data.get("reflection")
+    data = await WarmupReflectionProgram()(WarmupReflectionInput(answer=answer))
+    packet.project_context.lessons = data.lessons
     return None
 
 

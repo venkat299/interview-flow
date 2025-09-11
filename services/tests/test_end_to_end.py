@@ -7,6 +7,8 @@ import pytest
 
 from orchestrator_service import llm_api as ai
 from orchestrator_service.schemas import ContextPacket, ProjectContext
+from orchestrator_service.orchestrator import Orchestrator
+from session_service.interview_state import InterviewState
 
 
 @pytest.mark.asyncio
@@ -29,12 +31,12 @@ async def test_run_interview_end_to_end(monkeypatch):
                 return {"architecture": "svc", "key_technologies": ["python"]}
             if "constraints" in system_prompt and "list" in system_prompt:
                 return {"constraints": ["latency"]}
-            if "challenge" in system_prompt:
-                return {"challenge": "scaling"}
-            if "outcome" in system_prompt or "metrics" in system_prompt:
-                return {"outcome": "100rps"}
-            if "reflection" in system_prompt:
-                return {"reflection": "tests"}
+            if "hardest_challenge" in system_prompt or "challenge" in system_prompt:
+                return {"hardest_challenge": "scaling"}
+            if "outcomes" in system_prompt or "metrics" in system_prompt:
+                return {"outcomes": "100rps"}
+            if "lessons" in system_prompt or "reflection" in system_prompt:
+                return {"lessons": "tests"}
             return {"goal": "demo"}
         if task_name == "stage_2_parse":
             return {
@@ -42,6 +44,8 @@ async def test_run_interview_end_to_end(monkeypatch):
                 "confidence_ratings": {"python": 5},
                 "notes": ["api work"],
             }
+        if task_name == "question_generation":
+            return {"question_text": "components?"}
         if task_name == "stage_3_question":
             return {"question_text": "What is Python?"}
         if task_name == "stage_3_eval":

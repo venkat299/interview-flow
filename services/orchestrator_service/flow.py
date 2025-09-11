@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from langgraph.graph import StateGraph, START, END
 
-from .schemas import ContextPacket, ProjectContext, VerificationResult
+from .schemas import ContextPacket, VerificationResult
 from .programs.stage0_analysis import Stage0AnalysisProgram, JDResumeAnalysisInput
 from .programs.stage1_warmup import (
     WarmupOverviewProgram,
@@ -37,11 +37,10 @@ async def stage1_warmup_node(state: InterviewState) -> dict:
     """Parse warm-up responses into project context."""
     overview = await WarmupOverviewProgram()(WarmupOverviewInput(answer=state.selected_project or ""))
     constraint = await WarmupConstraintProgram()(WarmupConstraintInput(answer=state.project_context.scale_latency_slo or ""))
-    ctx = ProjectContext(
-        goal=overview.goal,
-        constraints=overview.constraints,
-        scale_latency_slo=constraint.scale_latency_slo,
-    )
+    ctx = state.project_context.model_copy()
+    ctx.goal = overview.goal
+    ctx.constraints = overview.constraints
+    ctx.scale_latency_slo = constraint.scale_latency_slo
     return {"project_context": ctx.model_dump()}
 
 

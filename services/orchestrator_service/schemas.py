@@ -80,9 +80,9 @@ class ProjectContext(BaseModel):
     team_size: Optional[str] = None
     architecture: Optional[str] = None
     key_technologies: List[str] = Field(default_factory=list)
-    challenge: Optional[str] = None
-    outcome: Optional[str] = None
-    reflection: Optional[str] = None
+    hardest_challenge: Optional[str] = None
+    outcomes: Optional[str] = None
+    lessons: Optional[str] = None
 
 
 class VerificationResult(BaseModel):
