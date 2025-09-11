@@ -1,5 +1,7 @@
 # Smart Screener AI
 
+*Documentation refreshed; obsolete blueprints have been removed.*
+
 ## 1. Project Objective
 
 The goal of this project is to develop an AI-powered technical screening platform that automates initial interviews. The system provides a dynamic, chat-based experience for candidates, asking intelligent, context-aware follow-up questions based on the job description and the candidate's live answers. This aims to provide a deeper, more accurate signal of a candidate's abilities than traditional coding tests.
@@ -57,6 +59,18 @@ Run the service with Docker Compose:
 
 The WebSocket session management is now embedded in the orchestration service
 and calls orchestration functions in‑process for lower latency.
+
+### Interview Stages
+
+The orchestrator advances the conversation through five stages:
+
+1. **Stage 0** – analyze the job description and resume to seed context and timers.
+2. **Stage 1** – warm‑up questions gather project background and constraints.
+3. **Stage 2** – evidence questions capture skill hooks and confidence ratings.
+4. **Stage 3** – verification prompts check fundamentals for each hook.
+5. **Stage 4** – wrap‑up summarizes strengths, risks, and follow-ups.
+
+See `application-flow.md` for a detailed walkthrough of these stages and service interactions.
 
 
 ## 4. Test Frontend & End-to-End Testing

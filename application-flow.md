@@ -2,6 +2,13 @@
 
 This document describes the end-to-end flow of the AI interview application, detailing how each service is initiated and interacts during a session.
 
+## Stage Overview
+- **Stage 0** – analyze the job description and resume to initialize context and timers.
+- **Stage 1** – warm-up prompts gather project background and constraints.
+- **Stage 2** – evidence questions collect skill hooks and confidence ratings.
+- **Stage 3** – verification turns check fundamentals for each hook.
+- **Stage 4** – wrap-up summarizes strengths, risks, and follow-ups.
+
 ## 1. Service Startup
 1. **FastAPI application** (`services/api_service/app/main.py`)
     - Creates `FastAPI` instance; adds CORS middleware.
