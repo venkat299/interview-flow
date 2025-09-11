@@ -15,6 +15,7 @@ from .llm_api import (
     theory_check_question,
     wrapup_closure,
 )
+from session_service.question_log_db import log_question_response
 
 
 class Orchestrator:
@@ -27,6 +28,15 @@ class Orchestrator:
         phase = state.current_phase
 
         if phase == "warm_up":
+            if answer is not None and getattr(state, "last_question_text", None):
+                log_question_response(
+                    stage=phase,
+                    question_type=getattr(state, "last_question_type", ""),
+                    question_text=getattr(state, "last_question_text", ""),
+                    answer_text=answer,
+                    session_id=getattr(state, "session_id", None),
+                    candidate_id=getattr(state, "candidate_id", None),
+                )
             step = state.current_warmup_step
             func_map = {
                 "select_project": warmup_select_project,
@@ -41,37 +51,67 @@ class Orchestrator:
             if q is None:
                 state.advance_warmup_step()
                 return await self.decide_next_action(state, None)
+            state.last_question_text = q.get("question_text")
+            state.last_question_type = q.get("question_type")
             return q
 
         if phase == "evidence":
-            step = state.current_evidence_step
-            func_map = {
-                "components": evidence_components,
-                "skill_task": evidence_skill_task,
-            }
-            q = await func_map[step](packet, answer)
+
+            if answer is not None and getattr(state, "last_question_text", None):
+                log_question_response(
+                    stage=phase,
+                    question_type=getattr(state, "last_question_type", ""),
+                    question_text=getattr(state, "last_question_text", ""),
+                    answer_text=answer,
+                    session_id=getattr(state, "session_id", None),
+                    candidate_id=getattr(state, "candidate_id", None),
+                )
+            q = await evidence_skill_question(packet, answer)
+
             if q is None:
                 state.advance_evidence_step()
                 return await self.decide_next_action(state, None)
-            return q
+            state.last_question_text = q
+            state.last_question_type = "evidence_skill"
+            return {"question_text": q, "question_type": "evidence_skill"}
+
 
         if phase == "theory":
+            if answer is not None and getattr(state, "last_question_text", None):
+                log_question_response(
+                    stage=phase,
+                    question_type=getattr(state, "last_question_type", ""),
+                    question_text=getattr(state, "last_question_text", ""),
+                    answer_text=answer,
+                    session_id=getattr(state, "session_id", None),
+                    candidate_id=getattr(state, "candidate_id", None),
+                )
             q = await theory_check_question(packet, answer)
             if q is None:
                 state.advance_phase()
                 return await self.decide_next_action(state, None)
+            state.last_question_text = q
+            state.last_question_type = "theory_check"
             return {"question_text": q, "question_type": "theory_check"}
 
         if phase == "wrap_up":
-            if state.wrapup_index >= len(state.wrapup_steps):
-                return None
-            step = state.current_wrapup_step
-            func_map = {"closure": wrapup_closure}
-            q = await func_map[step](packet, answer)
+            if answer is not None and getattr(state, "last_question_text", None):
+                log_question_response(
+                    stage=phase,
+                    question_type=getattr(state, "last_question_type", ""),
+                    question_text=getattr(state, "last_question_text", ""),
+                    answer_text=answer,
+                    session_id=getattr(state, "session_id", None),
+                    candidate_id=getattr(state, "candidate_id", None),
+                )
+            q = await wrap_up(packet, answer)
             if q is None:
-                state.advance_wrapup_step()
-                return await self.decide_next_action(state, None)
-            return q
+                state.advance_phase()
+                return None
+            state.last_question_text = q
+            state.last_question_type = "wrap_up"
+            return {"question_text": q, "question_type": "wrap_up"}
+
 
         return None
 

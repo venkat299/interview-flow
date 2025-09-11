@@ -61,12 +61,17 @@ class ConnectionManager:
                 payload.get("candidate_resume", ""),
                 duration_min=(time_limit if isinstance(time_limit, int) and time_limit > 0 else 18),
             )
-            state = InterviewState(packet)
+            session_id = self.session_ids.get(websocket)
+            candidate_id = payload.get("candidate_id")
+            state = InterviewState(
+                packet,
+                session_id=session_id,
+                candidate_id=candidate_id,
+            )
             self.states[websocket] = state
             self.history[websocket] = []
 
             # Persist a session row so REST APIs can find it
-            session_id = self.session_ids.get(websocket)
             try:
                 create_session(
                     session_id=session_id or "",
