@@ -23,6 +23,8 @@ from .programs.stage0_analysis import (
     JDResumeAnalysisInput,
 )
 from .programs.stage1_warmup import (
+    WarmupOverviewProgram,
+    WarmupOverviewInput,
     WarmupRoleProgram,
     WarmupRoleInput,
     WarmupArchitectureProgram,
@@ -313,15 +315,40 @@ async def warmup_select_project(
     update_followup_hooks(packet, answer)
     return None
 
-
-async def warmup_role_context(
+async def warmup_project_overview(
     packet: ContextPacket, answer: Optional[str] = None
 ) -> Optional[dict]:
-    """Warm-up step: capture role and team size."""
+    """Warm-up step: capture a brief project overview."""
 
     if answer is None:
         system_prompt = (
-            "You are an AI technical interviewer. Ask the candidate, in one concise sentence, to state their role and team size on the project "
+            "You are an AI technical interviewer. Ask the candidate for a one-sentence overview of the project "
+            f"{packet.selected_project}. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
+        )
+        data = await gateway.execute_task(
+            task_name="question_generation",
+            system_prompt=system_prompt,
+        )
+        _decrement_time(packet, 1)
+        return {"question_text": data["question_text"], "question_type": "warmup_project_overview"}
+
+    data = await WarmupOverviewProgram()(WarmupOverviewInput(answer=answer))
+    if data.goal:
+        packet.project_context.goal = data.goal
+    if data.constraints:
+        packet.project_context.constraints = data.constraints
+    update_followup_hooks(packet, answer)
+    return None
+
+
+async def warmup_role(
+    packet: ContextPacket, answer: Optional[str] = None
+) -> Optional[dict]:
+    """Warm-up step: capture the candidate's role."""
+
+    if answer is None:
+        system_prompt = (
+            "You are an AI technical interviewer. Ask the candidate to state their role on the project "
             f"{packet.selected_project}. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
         )
         data = await gateway.execute_task(
@@ -333,6 +360,28 @@ async def warmup_role_context(
 
     data = await WarmupRoleProgram()(WarmupRoleInput(answer=answer))
     packet.project_context.role = data.role
+    update_followup_hooks(packet, answer)
+    return None
+
+
+async def warmup_team_size(
+    packet: ContextPacket, answer: Optional[str] = None
+) -> Optional[dict]:
+    """Warm-up step: capture the team size."""
+
+    if answer is None:
+        system_prompt = (
+            "You are an AI technical interviewer. Ask the candidate how many people worked with them on the project "
+            f"{packet.selected_project}. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
+        )
+        data = await gateway.execute_task(
+            task_name="question_generation",
+            system_prompt=system_prompt,
+        )
+        _decrement_time(packet, 1)
+        return {"question_text": data["question_text"], "question_type": "warmup_team_size"}
+
+    data = await WarmupRoleProgram()(WarmupRoleInput(answer=answer))
     packet.project_context.team_size = data.team_size
     update_followup_hooks(packet, answer)
     return None
@@ -341,11 +390,11 @@ async def warmup_role_context(
 async def warmup_architecture(
     packet: ContextPacket, answer: Optional[str] = None
 ) -> Optional[dict]:
-    """Warm-up step: high-level architecture and technologies."""
+    """Warm-up step: describe high-level architecture."""
 
     if answer is None:
         system_prompt = (
-            "You are an AI technical interviewer. Ask the candidate to briefly describe the high-level architecture and key technologies of their project "
+            "You are an AI technical interviewer. Ask the candidate to briefly describe the high-level architecture of the project "
             f"{packet.selected_project} in one sentence. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
         )
         data = await gateway.execute_task(
@@ -357,6 +406,28 @@ async def warmup_architecture(
 
     data = await WarmupArchitectureProgram()(WarmupArchitectureInput(answer=answer))
     packet.project_context.architecture = data.architecture
+    update_followup_hooks(packet, answer)
+    return None
+
+
+async def warmup_tech_stack(
+    packet: ContextPacket, answer: Optional[str] = None
+) -> Optional[dict]:
+    """Warm-up step: capture key technologies used."""
+
+    if answer is None:
+        system_prompt = (
+            "You are an AI technical interviewer. Ask the candidate to list the main technologies or tools used on the project "
+            f"{packet.selected_project}. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
+        )
+        data = await gateway.execute_task(
+            task_name="question_generation",
+            system_prompt=system_prompt,
+        )
+        _decrement_time(packet, 1)
+        return {"question_text": data["question_text"], "question_type": "warmup_tech_stack"}
+
+    data = await WarmupArchitectureProgram()(WarmupArchitectureInput(answer=answer))
     packet.project_context.key_technologies = data.key_technologies
     packet.project_context.followup_hooks = data.followup_hooks
     packet.followup_hooks.extend(h for h in data.followup_hooks if h not in packet.followup_hooks)
@@ -395,7 +466,7 @@ async def warmup_challenge(
     if answer is None:
         system_prompt = (
             "You are an AI technical interviewer. Ask the candidate to describe, in one sentence, the toughest technical challenge they faced on the project "
-            f"{packet.selected_project} and how they addressed it. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
+            f"{packet.selected_project}. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
         )
         data = await gateway.execute_task(
             task_name="question_generation",
@@ -406,6 +477,28 @@ async def warmup_challenge(
 
     data = await WarmupChallengeProgram()(WarmupChallengeInput(answer=answer))
     packet.project_context.hardest_challenge = data.hardest_challenge
+    update_followup_hooks(packet, answer)
+    return None
+
+
+async def warmup_resolution(
+    packet: ContextPacket, answer: Optional[str] = None
+) -> Optional[dict]:
+    """Warm-up step: how the challenge was resolved."""
+
+    if answer is None:
+        system_prompt = (
+            "You are an AI technical interviewer. Ask the candidate, in one sentence, how they addressed that challenge on the project "
+            f"{packet.selected_project}. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
+        )
+        data = await gateway.execute_task(
+            task_name="question_generation",
+            system_prompt=system_prompt,
+        )
+        _decrement_time(packet, 1)
+        return {"question_text": data["question_text"], "question_type": "warmup_resolution"}
+
+    packet.notes.append(f"Challenge resolution: {answer}")
     update_followup_hooks(packet, answer)
     return None
 

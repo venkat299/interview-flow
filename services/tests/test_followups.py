@@ -7,26 +7,13 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from orchestrator_service import llm_api as ai
 from orchestrator_service.orchestrator import Orchestrator
-from session_service.interview_state import InterviewState\
-
+from session_service.interview_state import InterviewState
 from orchestrator_service.schemas import ContextPacket
 
 
 
 @pytest.mark.asyncio
 async def test_keyword_followup_injected(monkeypatch):
-    qgen_iter = iter([
-        {"question_text": "project?"},
-        {"question_text": "role?"},
-        {"question_text": "architecture?"},
-        {"question_text": "constraints?"},
-    ])
-    parse_iter = iter([
-        {"project_name": "demo"},
-        {"role": "lead", "team_size": "5"},
-        {"architecture": "svc", "key_technologies": ["python"], "followup_hooks": []},
-    ])
-
     async def fake_execute(task_name, system_prompt, user_prompt=None):
         if task_name == "stage_0_analysis":
             return {
@@ -39,9 +26,23 @@ async def test_keyword_followup_injected(monkeypatch):
         if task_name == "skill_tag_refinement":
             return {"tags": []}
         if task_name == "question_generation":
-            return next(qgen_iter)
+            return {"question_text": "q"}
         if task_name == "stage_1_parse":
-            return next(parse_iter)
+            if "project name" in system_prompt:
+                return {"project_name": "demo"}
+            if "goal" in system_prompt:
+                return {"goal": "demo", "constraints": []}
+            if "role and team_size" in system_prompt:
+                if "lead" in (user_prompt or "").lower():
+                    return {"role": "lead", "team_size": None}
+                if "5" in (user_prompt or ""):
+                    return {"role": None, "team_size": "5"}
+            if "architecture" in system_prompt:
+                if "svc" in (user_prompt or ""):
+                    return {"architecture": "svc", "key_technologies": [], "followup_hooks": []}
+                return {"architecture": None, "key_technologies": [], "followup_hooks": []}
+            if "constraints" in system_prompt and "list" in system_prompt:
+                return {"constraints": ["latency"]}
         raise AssertionError(task_name)
 
     monkeypatch.setattr(ai.gateway, "execute_task", fake_execute)
@@ -54,21 +55,30 @@ async def test_keyword_followup_injected(monkeypatch):
     assert q1["question_type"] == "warmup_project"
 
     q2 = await orch.loop(state, "demo project")
-    assert q2["question_type"] == "warmup_role"
+    assert q2["question_type"] == "warmup_project_overview"
 
-    q3 = await orch.loop(state, "lead of 5")
-    assert q3["question_type"] == "warmup_architecture"
+    q3 = await orch.loop(state, "overview")
+    assert q3["question_type"] == "warmup_role"
 
-    q4 = await orch.loop(state, "svc using Kafka")
-    assert q4["question_type"] == "targeted_followup"
-    assert "Kafka" in q4["question_text"]
+    q4 = await orch.loop(state, "lead")
+    assert q4["question_type"] == "warmup_team_size"
 
-    q5 = await orch.loop(state, "details about kafka on Kubernetes")
-    assert q5["question_type"] == "targeted_followup"
-    assert "Kubernetes" in q5["question_text"]
+    q5 = await orch.loop(state, "5")
+    assert q5["question_type"] == "warmup_architecture"
 
-    q6 = await orch.loop(state, "k8s follow-up response")
-    assert q6["question_type"] == "warmup_constraints"
+    q6 = await orch.loop(state, "svc")
+    assert q6["question_type"] == "warmup_tech_stack"
+
+    q7 = await orch.loop(state, "Kafka")
+    assert q7["question_type"] == "targeted_followup"
+    assert "Kafka" in q7["question_text"]
+
+    q8 = await orch.loop(state, "details about kafka on Kubernetes")
+    assert q8["question_type"] == "targeted_followup"
+    assert "Kubernetes" in q8["question_text"]
+
+    q9 = await orch.loop(state, "k8s follow-up response")
+    assert q9["question_type"] == "warmup_constraints"
 
 
 @pytest.mark.asyncio

@@ -27,10 +27,17 @@ async def test_run_interview_end_to_end(monkeypatch):
         if task_name == "stage_1_parse":
             if "project name" in system_prompt:
                 return {"project_name": "demo"}
-            if "team_size" in system_prompt:
-                return {"role": "lead", "team_size": "5"}
+            if "goal" in system_prompt:
+                return {"goal": "demo", "constraints": []}
+            if "role and team_size" in system_prompt:
+                if "Lead" in (user_prompt or ""):
+                    return {"role": "lead", "team_size": None}
+                if "5" in (user_prompt or ""):
+                    return {"role": None, "team_size": "5"}
             if "architecture" in system_prompt:
-                return {"architecture": "svc", "key_technologies": ["python"], "followup_hooks": ["redis"]}
+                if "svc" in (user_prompt or ""):
+                    return {"architecture": "svc", "key_technologies": [], "followup_hooks": []}
+                return {"architecture": None, "key_technologies": ["python"], "followup_hooks": ["redis"]}
             if "constraints" in system_prompt and "list" in system_prompt:
                 return {"constraints": ["latency"]}
             if "hardest_challenge" in system_prompt or "challenge" in system_prompt:
@@ -67,51 +74,63 @@ async def test_run_interview_end_to_end(monkeypatch):
     assert q1["question_type"] == "warmup_project"
 
     q2 = await orch.loop(state, "demo project")
-    assert q2["question_type"] == "warmup_role"
+    assert q2["question_type"] == "warmup_project_overview"
 
-    q3 = await orch.loop(state, "Lead of team 5")
-    assert q3["question_type"] == "warmup_architecture"
+    q3 = await orch.loop(state, "overview")
+    assert q3["question_type"] == "warmup_role"
 
-    q4 = await orch.loop(state, "svc using python")
-    assert q4["question_type"] == "warmup_constraints"
+    q4 = await orch.loop(state, "Lead")
+    assert q4["question_type"] == "warmup_team_size"
 
-    q5 = await orch.loop(state, "latency under 100ms")
-    assert q5["question_type"] == "warmup_challenge"
+    q5 = await orch.loop(state, "Team of 5")
+    assert q5["question_type"] == "warmup_architecture"
 
-    q6 = await orch.loop(state, "scaling issues")
-    assert q6["question_type"] == "warmup_outcome"
+    q6 = await orch.loop(state, "svc architecture")
+    assert q6["question_type"] == "warmup_tech_stack"
 
-    q7 = await orch.loop(state, "100rps")
-    assert q7["question_type"] == "warmup_reflection"
+    q7 = await orch.loop(state, "python and redis")
+    assert q7["question_type"] == "warmup_constraints"
 
-    q8 = await orch.loop(state, "better tests")
-    assert q8["question_type"] == "evidence_components"
+    q8 = await orch.loop(state, "latency under 100ms")
+    assert q8["question_type"] == "warmup_challenge"
 
-    q9 = await orch.loop(state, "component details")
-    assert q9["question_type"] == "evidence_choice_space"
+    q9 = await orch.loop(state, "scaling issues")
+    assert q9["question_type"] == "warmup_resolution"
 
-    q10 = await orch.loop(state, "considered options")
-    assert q10["question_type"] == "evidence_decision_rationale"
+    q10 = await orch.loop(state, "used caching")
+    assert q10["question_type"] == "warmup_outcome"
 
-    q11 = await orch.loop(state, "selected because")
-    assert q11["question_type"] == "evidence_outcome_validation"
+    q11 = await orch.loop(state, "100rps")
+    assert q11["question_type"] == "warmup_reflection"
 
-    q12 = await orch.loop(state, "it worked")
-    assert q12["question_type"] == "evidence_tradeoff_reflection"
+    q12 = await orch.loop(state, "better tests")
+    assert q12["question_type"] == "evidence_components"
 
-    q13 = await orch.loop(state, "tradeoffs considered")
-    assert q13["question_type"] == "theory_primary"
+    q13 = await orch.loop(state, "component details")
+    assert q13["question_type"] == "evidence_choice_space"
 
-    q14 = await orch.loop(state, "A language")
-    assert q14["question_type"] == "theory_followup"
+    q14 = await orch.loop(state, "considered options")
+    assert q14["question_type"] == "evidence_decision_rationale"
 
-    q15 = await orch.loop(state, "deeper answer")
-    assert q15["question_type"] == "wrapup_feedback"
+    q15 = await orch.loop(state, "selected because")
+    assert q15["question_type"] == "evidence_outcome_validation"
 
-    q16 = await orch.loop(state, "All good")
-    assert q16["question_type"] == "wrapup_closing"
+    q16 = await orch.loop(state, "it worked")
+    assert q16["question_type"] == "evidence_tradeoff_reflection"
 
-    q17 = await orch.loop(state)
-    assert q17 is None
+    q17 = await orch.loop(state, "tradeoffs considered")
+    assert q17["question_type"] == "theory_primary"
+
+    q18 = await orch.loop(state, "A language")
+    assert q18["question_type"] == "theory_followup"
+
+    q19 = await orch.loop(state, "deeper answer")
+    assert q19["question_type"] == "wrapup_feedback"
+
+    q20 = await orch.loop(state, "All good")
+    assert q20["question_type"] == "wrapup_closing"
+
+    q21 = await orch.loop(state)
+    assert q21 is None
     assert state.packet.time_remaining_min == 0
 
