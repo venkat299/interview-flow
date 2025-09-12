@@ -272,12 +272,16 @@ async def warmup_select_project(
     """Warm-up step: have the candidate pick a project."""
 
     if answer is None:
-        question = (
-            "Name the project most relevant to "
-            f"{packet.primary_overlap_focus}. Reply with the project name only."
+        system_prompt = (
+            "You are an AI technical interviewer. Ask the candidate to name the project from their resume that is most relevant to "
+            f"{packet.primary_overlap_focus}. The question should be concise and request only the project name. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
+        )
+        data = await gateway.execute_task(
+            task_name="question_generation",
+            system_prompt=system_prompt,
         )
         _decrement_time(packet, 1)
-        return {"question_text": question, "question_type": "warmup_project"}
+        return {"question_text": data["question_text"], "question_type": "warmup_project"}
 
     data = await gateway.execute_task(
         task_name="stage_1_parse",
@@ -294,12 +298,16 @@ async def warmup_role_context(
     """Warm-up step: capture role and team size."""
 
     if answer is None:
-        question = (
-            f"In one sentence, what was your role and team size on {packet.selected_project}? "
-            "Be concise."
+        system_prompt = (
+            "You are an AI technical interviewer. Ask the candidate, in one concise sentence, to state their role and team size on the project "
+            f"{packet.selected_project}. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
+        )
+        data = await gateway.execute_task(
+            task_name="question_generation",
+            system_prompt=system_prompt,
         )
         _decrement_time(packet, 1)
-        return {"question_text": question, "question_type": "warmup_role"}
+        return {"question_text": data["question_text"], "question_type": "warmup_role"}
 
     data = await WarmupRoleProgram()(WarmupRoleInput(answer=answer))
     packet.project_context.role = data.role
@@ -313,12 +321,16 @@ async def warmup_architecture(
     """Warm-up step: high-level architecture and technologies."""
 
     if answer is None:
-        question = (
-            "Briefly describe the high-level architecture and key technologies. "
-            "Answer in one sentence."
+        system_prompt = (
+            "You are an AI technical interviewer. Ask the candidate to briefly describe the high-level architecture and key technologies of their project "
+            f"{packet.selected_project} in one sentence. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
+        )
+        data = await gateway.execute_task(
+            task_name="question_generation",
+            system_prompt=system_prompt,
         )
         _decrement_time(packet, 1)
-        return {"question_text": question, "question_type": "warmup_architecture"}
+        return {"question_text": data["question_text"], "question_type": "warmup_architecture"}
 
     data = await WarmupArchitectureProgram()(WarmupArchitectureInput(answer=answer))
     packet.project_context.architecture = data.architecture
@@ -332,12 +344,16 @@ async def warmup_constraints(
     """Warm-up step: capture key constraints."""
 
     if answer is None:
-        question = (
-            "List the main technical constraints you faced (e.g., scale, latency). "
-            "Keep it short."
+        system_prompt = (
+            "You are an AI technical interviewer. Ask the candidate to list the main technical constraints they faced on the project "
+            f"{packet.selected_project} (for example, scale or latency). Keep the question short. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
+        )
+        data = await gateway.execute_task(
+            task_name="question_generation",
+            system_prompt=system_prompt,
         )
         _decrement_time(packet, 1)
-        return {"question_text": question, "question_type": "warmup_constraints"}
+        return {"question_text": data["question_text"], "question_type": "warmup_constraints"}
 
     data = await WarmupConstraintsProgram()(WarmupConstraintsInput(answer=answer))
     packet.project_context.constraints = data.constraints
@@ -350,11 +366,16 @@ async def warmup_challenge(
     """Warm-up step: hardest challenge faced."""
 
     if answer is None:
-        question = (
-            "What was the toughest technical challenge and how did you address it? One sentence."
+        system_prompt = (
+            "You are an AI technical interviewer. Ask the candidate to describe, in one sentence, the toughest technical challenge they faced on the project "
+            f"{packet.selected_project} and how they addressed it. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
+        )
+        data = await gateway.execute_task(
+            task_name="question_generation",
+            system_prompt=system_prompt,
         )
         _decrement_time(packet, 1)
-        return {"question_text": question, "question_type": "warmup_challenge"}
+        return {"question_text": data["question_text"], "question_type": "warmup_challenge"}
 
     data = await WarmupChallengeProgram()(WarmupChallengeInput(answer=answer))
     packet.project_context.hardest_challenge = data.hardest_challenge
@@ -367,11 +388,16 @@ async def warmup_outcome(
     """Warm-up step: outcomes or metrics achieved."""
 
     if answer is None:
-        question = (
-            "What measurable outcome or metric did the project achieve? One sentence."
+        system_prompt = (
+            "You are an AI technical interviewer. Ask the candidate, in one sentence, about a measurable outcome or metric achieved by the project "
+            f"{packet.selected_project}. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
+        )
+        data = await gateway.execute_task(
+            task_name="question_generation",
+            system_prompt=system_prompt,
         )
         _decrement_time(packet, 1)
-        return {"question_text": question, "question_type": "warmup_outcome"}
+        return {"question_text": data["question_text"], "question_type": "warmup_outcome"}
 
     data = await WarmupOutcomeProgram()(WarmupOutcomeInput(answer=answer))
     packet.project_context.outcomes = data.outcomes
@@ -384,11 +410,16 @@ async def warmup_reflection(
     """Warm-up step: reflection or lessons learned."""
 
     if answer is None:
-        question = (
-            "Looking back, what would you improve or do differently? One sentence."
+        system_prompt = (
+            "You are an AI technical interviewer. Ask the candidate to reflect on the project "
+            f"{packet.selected_project} and state, in one sentence, what they would improve or do differently. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
+        )
+        data = await gateway.execute_task(
+            task_name="question_generation",
+            system_prompt=system_prompt,
         )
         _decrement_time(packet, 1)
-        return {"question_text": question, "question_type": "warmup_reflection"}
+        return {"question_text": data["question_text"], "question_type": "warmup_reflection"}
 
     data = await WarmupReflectionProgram()(WarmupReflectionInput(answer=answer))
     packet.project_context.lessons = data.lessons
