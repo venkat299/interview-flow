@@ -50,7 +50,6 @@ async def stage2_evidence_node(state: InterviewState) -> dict:
     output = await EvidenceProgram()(EvidenceInput(answer=answer))
     return {
         "skill_hooks": output.skill_hooks,
-        "confidence_ratings": output.confidence_ratings,
         "notes": state.notes + output.notes,
     }
 
@@ -65,8 +64,7 @@ async def stage3_theory_node(state: InterviewState) -> dict:
         return {}
 
     skill = state.skill_hooks[idx]
-    confidence = state.confidence_ratings.get(skill, 3)
-    question = await TheoryQuestionProgram()(TheoryQuestionInput(skill=skill, confidence=confidence))
+    question = await TheoryQuestionProgram()(TheoryQuestionInput(skill=skill))
     eval_result = await TheoryEvalProgram()(TheoryEvalInput(answer=""))
     verification = VerificationResult(
         skill=skill, result=eval_result.result, rationale=eval_result.rationale
