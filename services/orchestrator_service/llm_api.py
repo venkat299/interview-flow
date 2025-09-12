@@ -295,6 +295,8 @@ async def warmup_select_project(
     """Warm-up step: have the candidate pick a project."""
 
     if answer is None:
+        if packet.selected_project:
+            return None
         system_prompt = (
             "You are an AI technical interviewer. Ask the candidate to name the project from their resume that is most relevant to "
             f"{packet.primary_overlap_focus}. The question should be concise and request only the project name. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
@@ -321,6 +323,8 @@ async def warmup_project_overview(
     """Warm-up step: capture a brief project overview."""
 
     if answer is None:
+        if packet.project_context.goal:
+            return None
         system_prompt = (
             "You are an AI technical interviewer. Ask the candidate for a one-sentence overview of the project "
             f"{packet.selected_project}. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
@@ -347,6 +351,8 @@ async def warmup_role(
     """Warm-up step: capture the candidate's role."""
 
     if answer is None:
+        if packet.project_context.role:
+            return None
         system_prompt = (
             "You are an AI technical interviewer. Ask the candidate to state their role on the project "
             f"{packet.selected_project}. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
@@ -370,6 +376,8 @@ async def warmup_team_size(
     """Warm-up step: capture the team size."""
 
     if answer is None:
+        if packet.project_context.team_size:
+            return None
         system_prompt = (
             "You are an AI technical interviewer. Ask the candidate how many people worked with them on the project "
             f"{packet.selected_project}. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
@@ -393,6 +401,8 @@ async def warmup_architecture(
     """Warm-up step: describe high-level architecture."""
 
     if answer is None:
+        if packet.project_context.architecture:
+            return None
         system_prompt = (
             "You are an AI technical interviewer. Ask the candidate to briefly describe the high-level architecture of the project "
             f"{packet.selected_project} in one sentence. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
@@ -416,6 +426,8 @@ async def warmup_tech_stack(
     """Warm-up step: capture key technologies used."""
 
     if answer is None:
+        if packet.project_context.key_technologies:
+            return None
         system_prompt = (
             "You are an AI technical interviewer. Ask the candidate to list the main technologies or tools used on the project "
             f"{packet.selected_project}. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
@@ -441,6 +453,8 @@ async def warmup_constraints(
     """Warm-up step: capture key constraints."""
 
     if answer is None:
+        if packet.project_context.constraints:
+            return None
         system_prompt = (
             "You are an AI technical interviewer. Ask the candidate to list the main technical constraints they faced on the project "
             f"{packet.selected_project} (for example, scale or latency). Keep the question short. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
@@ -464,6 +478,8 @@ async def warmup_challenge(
     """Warm-up step: hardest challenge faced."""
 
     if answer is None:
+        if packet.project_context.hardest_challenge:
+            return None
         system_prompt = (
             "You are an AI technical interviewer. Ask the candidate to describe, in one sentence, the toughest technical challenge they faced on the project "
             f"{packet.selected_project}. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
@@ -487,6 +503,8 @@ async def warmup_resolution(
     """Warm-up step: how the challenge was resolved."""
 
     if answer is None:
+        if any(n.startswith("Challenge resolution:") for n in packet.notes):
+            return None
         system_prompt = (
             "You are an AI technical interviewer. Ask the candidate, in one sentence, how they addressed that challenge on the project "
             f"{packet.selected_project}. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
@@ -509,6 +527,8 @@ async def warmup_outcome(
     """Warm-up step: outcomes or metrics achieved."""
 
     if answer is None:
+        if packet.project_context.outcomes or packet.project_context.evaluation_metrics:
+            return None
         system_prompt = (
             "You are an AI technical interviewer. Ask the candidate, in one sentence, about a measurable outcome or metric achieved by the project "
             f"{packet.selected_project}. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
@@ -533,6 +553,8 @@ async def warmup_reflection(
     """Warm-up step: reflection or lessons learned."""
 
     if answer is None:
+        if packet.project_context.lessons:
+            return None
         system_prompt = (
             "You are an AI technical interviewer. Ask the candidate to reflect on the project "
             f"{packet.selected_project} and state, in one sentence, what they would improve or do differently. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
@@ -556,6 +578,8 @@ async def evidence_components(
     """Stage-2 step: ask about project components owned."""
 
     if answer is None:
+        if any(n.startswith("Components:") for n in packet.notes):
+            return None
         context = _skill_prompt_context(packet)
         system_prompt = (
             "You are an AI technical interviewer asking the candidate to briefly list 2–3 major components they built on the selected project, noting each component's purpose and main interfaces"
@@ -579,6 +603,8 @@ async def evidence_choice_space(
     """Stage-2 step: ask about considered options or approaches."""
 
     if answer is None:
+        if any(n.startswith("Choice space:") for n in packet.notes):
+            return None
         context = _skill_prompt_context(packet)
         system_prompt = (
             "You are an AI technical interviewer asking, in one short question, what options or approaches the candidate considered for the chosen project"
@@ -607,6 +633,8 @@ async def evidence_decision_rationale(
     """Stage-2 step: probe why a specific option was chosen."""
 
     if answer is None:
+        if any(n.startswith("Rationale:") for n in packet.notes):
+            return None
         context = _skill_prompt_context(packet)
         system_prompt = (
             "You are an AI technical interviewer asking the candidate to briefly explain why they chose a particular option from the ones considered"
@@ -635,6 +663,8 @@ async def evidence_outcome_validation(
     """Stage-2 step: request evidence that the choice worked."""
 
     if answer is None:
+        if any(n.startswith("Outcome:") for n in packet.notes):
+            return None
         context = _skill_prompt_context(packet)
         system_prompt = (
             "You are an AI technical interviewer; in a short question, ask the candidate for brief evidence that their chosen option succeeded"
@@ -663,6 +693,8 @@ async def evidence_tradeoff_reflection(
     """Stage-2 step: explore trade-offs or alternative paths."""
 
     if answer is None:
+        if any(n.startswith("Trade-offs:") for n in packet.notes):
+            return None
         context = _skill_prompt_context(packet)
         system_prompt = (
             "You are an AI technical interviewer asking the candidate to reflect on trade-offs or alternative paths they considered and why those were not chosen"
