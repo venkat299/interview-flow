@@ -1,7 +1,7 @@
 """DSPy program for Stage-2 evidence parsing."""
 from __future__ import annotations
 
-from typing import Dict, List
+from typing import List
 
 import dspy
 from pydantic import BaseModel, Field
@@ -10,16 +10,15 @@ from gateway_service import gateway
 
 
 class EvidenceInput(BaseModel):
-    """User answer describing responsibilities and skill confidence."""
+    """User answer describing responsibilities and skills."""
 
     answer: str
 
 
 class EvidenceOutput(BaseModel):
-    """Parsed skill hooks, confidence ratings, and notes."""
+    """Parsed skill hooks and notes."""
 
     skill_hooks: List[str] = Field(default_factory=list)
-    confidence_ratings: Dict[str, int] = Field(default_factory=dict)
     notes: List[str] = Field(default_factory=list)
 
 
@@ -29,7 +28,6 @@ class EvidenceProgram(dspy.Module):
     system_prompt: str = (
         "From the answer, extract:"
         " skill_hooks (list of 3-5 concise items to verify later),"
-        " confidence_ratings (mapping skill->1-5),"
         " and notes (brief bullets)."
         " Respond with JSON containing these keys."
     )

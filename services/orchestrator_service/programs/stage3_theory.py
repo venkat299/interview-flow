@@ -13,7 +13,6 @@ class TheoryQuestionInput(BaseModel):
     """Parameters for generating a theory check question."""
 
     skill: str
-    confidence: int
 
 
 class TheoryQuestionOutput(BaseModel):
@@ -26,15 +25,12 @@ class TheoryQuestionProgram(dspy.Module):
     """Generate a concept-first verification question."""
 
     system_prompt_template: str = (
-        "You are verifying understanding of '{skill}'. Candidate self-rated "
-        "confidence {confidence}/5. Ask one concise concept-first question. "
+        "You are verifying understanding of '{skill}'. Ask one concise concept-first question. "
         'Respond with JSON {{"question_text": string}}.'
     )
 
     async def __call__(self, inp: TheoryQuestionInput) -> TheoryQuestionOutput:
-        system_prompt = self.system_prompt_template.format(
-            skill=inp.skill, confidence=inp.confidence
-        )
+        system_prompt = self.system_prompt_template.format(skill=inp.skill)
         data = await gateway.execute_task(
             task_name="stage_3_question",
             system_prompt=system_prompt,

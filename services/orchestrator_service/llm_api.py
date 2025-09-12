@@ -576,9 +576,8 @@ async def theory_check_question(
     skill = skills[idx]
 
     if answer is None:
-        confidence = packet.confidence_ratings.get(skill, 3)
         q_out = await _theory_question(
-            TheoryQuestionInput(skill=skill, confidence=confidence)
+            TheoryQuestionInput(skill=skill)
         )
         _decrement_time(packet, 1)
         return q_out.question_text

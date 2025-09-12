@@ -25,7 +25,6 @@ async def test_run_interview_flow(monkeypatch):
         if task_name == "stage_2_parse":
             return {
                 "skill_hooks": ["python", "db"],
-                "confidence_ratings": {"python": 5, "db": 4},
                 "notes": ["api work"],
             }
         if task_name == "stage_3_question":

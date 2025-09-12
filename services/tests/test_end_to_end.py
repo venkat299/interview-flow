@@ -43,7 +43,6 @@ async def test_run_interview_end_to_end(monkeypatch):
         if task_name == "stage_2_parse":
             return {
                 "skill_hooks": ["python"],
-                "confidence_ratings": {"python": 5},
                 "notes": ["api work"],
             }
         if task_name == "question_generation":

@@ -1,5 +1,5 @@
 """Pydantic models for the interview module."""
-from typing import Dict, List, Optional
+from typing import List, Optional
 from pydantic import BaseModel, Field
 
 
@@ -108,7 +108,6 @@ class ContextPacket(BaseModel):
     selected_project: Optional[str] = None
     project_context: ProjectContext = Field(default_factory=ProjectContext)
     skill_hooks: List[str] = Field(default_factory=list)
-    confidence_ratings: Dict[str, int] = Field(default_factory=dict)
     verifications: List[VerificationResult] = Field(default_factory=list)
     notes: List[str] = Field(default_factory=list)
     role_skill_tags: List[str] = Field(default_factory=list)
