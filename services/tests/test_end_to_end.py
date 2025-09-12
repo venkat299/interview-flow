@@ -103,7 +103,7 @@ async def test_run_interview_end_to_end(monkeypatch):
     assert q13["question_type"] == "theory_primary"
 
     q14 = await orch.loop(state, "A language")
-    assert q14["question_type"] == "theory_follow_up"
+    assert q14["question_type"] == "theory_followup"
 
     q15 = await orch.loop(state, "deeper answer")
     assert q15["question_type"] == "wrapup_candidate_questions"

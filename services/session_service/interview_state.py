@@ -27,7 +27,7 @@ class InterviewState:
     ]
     theory_steps: List[str] = [
         "primary",
-        "follow_up",
+        "followup",
     ]
     wrapup_steps: List[str] = [
         "candidate_questions",
