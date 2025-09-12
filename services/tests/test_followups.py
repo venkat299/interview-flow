@@ -7,8 +7,10 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from orchestrator_service import llm_api as ai
 from orchestrator_service.orchestrator import Orchestrator
-from session_service.interview_state import InterviewState
+from session_service.interview_state import InterviewState\
+
 from orchestrator_service.schemas import ContextPacket
+
 
 
 @pytest.mark.asyncio
@@ -87,3 +89,4 @@ async def test_theory_eval_handles_bad_json(monkeypatch):
     ver = packet.verifications[-1]
     assert ver.followup_result == "fail"
     assert "bad json" in ver.followup_rationale
+

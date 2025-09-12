@@ -43,7 +43,9 @@ class Orchestrator:
                 session_id=getattr(state, "session_id", None),
                 candidate_id=getattr(state, "candidate_id", None),
             )
+
             update_followup_hooks(packet, answer)
+
             return await self.decide_next_action(state, None)
 
         # Insert targeted follow-up questions when hooks are present
