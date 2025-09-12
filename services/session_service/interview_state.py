@@ -30,8 +30,8 @@ class InterviewState:
         "followup",
     ]
     wrapup_steps: List[str] = [
-        "candidate_questions",
         "feedback",
+        "closing",
     ]
 
     def __init__(

@@ -17,8 +17,8 @@ from .llm_api import (
     evidence_tradeoff_reflection,
     theory_primary_question,
     theory_followup_question,
-    wrapup_candidate_questions,
     wrapup_feedback,
+    wrapup_closing,
 )
 from .followups import build_followup_question, update_followup_hooks
 from session_service.question_log_db import log_question_response
@@ -154,9 +154,21 @@ class Orchestrator:
                 return None
             step = state.current_wrapup_step
             func_map = {
-                "candidate_questions": wrapup_candidate_questions,
                 "feedback": wrapup_feedback,
+                "closing": wrapup_closing,
             }
+            if step == "closing":
+                q = await func_map[step](packet)
+                log_question_response(
+                    stage=phase,
+                    question_type=step,
+                    question_text=q.get("question_text", ""),
+                    answer_text="",
+                    session_id=getattr(state, "session_id", None),
+                    candidate_id=getattr(state, "candidate_id", None),
+                )
+                state.advance_wrapup_step()
+                return q
             q = await func_map[step](packet, answer)
             if answer is not None and getattr(state, "last_question_text", None):
                 log_question_response(
