@@ -564,44 +564,56 @@ async def evidence_tradeoff_reflection(
     return None
 
 
-async def theory_check_question(
-    packet: ContextPacket, answer: Optional[str] = None
-) -> Optional[str]:
-    """Stage-3: Verify fundamentals for each skill hook."""
-
-    skills = packet.skill_hooks or packet.jd_core_skills
-    idx = len(packet.verifications)
-    if idx >= len(skills):
-        return None
-    skill = skills[idx]
+async def theory_primary(
+    packet: ContextPacket, skill: str, answer: Optional[str] = None
+) -> Optional[dict]:
+    """Stage-3 step: ask a primary theory question for a skill."""
 
     if answer is None:
-        q_out = await _theory_question(
-            TheoryQuestionInput(skill=skill)
-        )
+        q_out = await _theory_question(TheoryQuestionInput(skill=skill))
         _decrement_time(packet, 1)
-        return q_out.question_text
+        return {"question_text": q_out.question_text, "question_type": "theory_primary"}
 
     e_out = await _theory_eval(TheoryEvalInput(answer=answer))
     packet.verifications.append(
-        VerificationResult(
-            skill=skill,
-            result=e_out.result,
-            rationale=e_out.rationale,
-        )
+        VerificationResult(skill=skill, result=e_out.result, rationale=e_out.rationale)
     )
     return None
 
 
-async def wrapup_closure(
+async def theory_follow_up(
+    packet: ContextPacket, skill: str, answer: Optional[str] = None
+) -> Optional[dict]:
+    """Stage-3 step: follow-up question on the same skill."""
+
+    if answer is None:
+        system_prompt = (
+            f"You are verifying understanding of '{skill}'. Ask one concise follow-up question. "
+            'Respond with JSON {"question_text": string}.'
+        )
+        data = await gateway.execute_task(
+            task_name="stage_3_question",
+            system_prompt=system_prompt,
+        )
+        _decrement_time(packet, 1)
+        return {"question_text": data["question_text"], "question_type": "theory_follow_up"}
+
+    e_out = await _theory_eval(TheoryEvalInput(answer=answer))
+    packet.verifications.append(
+        VerificationResult(skill=skill, result=e_out.result, rationale=e_out.rationale)
+    )
+    return None
+
+
+async def wrapup_candidate_questions(
     packet: ContextPacket, answer: Optional[str] = None
 ) -> Optional[dict]:
-    """Stage-4 step: invite final questions and capture summary."""
+    """Stage-4 step: invite candidate questions about the role or team."""
 
     if answer is None:
         notes = "; ".join(packet.notes)
         system_prompt = (
-            "You are an AI technical interviewer wrapping up the conversation. Based on these notes from the interview, generate a final personalized question inviting the candidate to ask about the role, roadmap, stack, or anything else. "
+            "You are an AI technical interviewer wrapping up the conversation. Based on these notes from the interview, ask the candidate in one short sentence if they have any questions about the role, team, or company. "
             f"Notes: {notes}. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
         )
         data = await gateway.execute_task(
@@ -609,11 +621,31 @@ async def wrapup_closure(
             system_prompt=system_prompt,
         )
         _decrement_time(packet, 1)
-        return {"question_text": data["question_text"], "question_type": "wrapup_closure"}
+        return {"question_text": data["question_text"], "question_type": "wrapup_candidate_questions"}
 
-    out = await _wrap_up(
-        WrapUpInput(notes=packet.notes, verifications=packet.verifications)
-    )
+    packet.notes.append(f"Candidate questions: {answer}")
+    return None
+
+
+async def wrapup_feedback(
+    packet: ContextPacket, answer: Optional[str] = None
+) -> Optional[dict]:
+    """Stage-4 step: gather feedback and finalize summary."""
+
+    if answer is None:
+        system_prompt = (
+            "You are an AI technical interviewer concluding the interview. Ask the candidate for brief feedback on this interview experience. "
+            "Respond ONLY with a single, valid JSON object with a single key 'question_text'."
+        )
+        data = await gateway.execute_task(
+            task_name="question_generation",
+            system_prompt=system_prompt,
+        )
+        _decrement_time(packet, 1)
+        return {"question_text": data["question_text"], "question_type": "wrapup_feedback"}
+
+    packet.notes.append(f"Candidate feedback: {answer}")
+    out = await _wrap_up(WrapUpInput(notes=packet.notes, verifications=packet.verifications))
     if out.strengths:
         packet.notes.append("Strengths: " + ", ".join(out.strengths))
     if out.risks:
