@@ -1,6 +1,5 @@
 # Smart Screener AI
 
-*Documentation refreshed; obsolete blueprints have been removed.*
 
 ## 1. Project Objective
 
