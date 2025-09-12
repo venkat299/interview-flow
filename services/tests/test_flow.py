@@ -54,6 +54,7 @@ async def test_run_interview_flow(monkeypatch):
     assert result.project_context.goal == "demo"
     assert result.skill_hooks == ["python", "db"]
     assert result.followup_hooks == ["redis"]
+    assert result.resolved_followup_hooks == []
     assert result.project_context.evaluation_metrics == {"latency": "100ms"}
     assert [v.skill for v in result.verifications] == ["redis"]
     assert call_order == [

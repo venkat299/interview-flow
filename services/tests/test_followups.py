@@ -71,14 +71,72 @@ async def test_keyword_followup_injected(monkeypatch):
 
     q7 = await orch.loop(state, "Kafka")
     assert q7["question_type"] == "targeted_followup"
-    assert "Kafka" in q7["question_text"]
+    assert "kafka" in q7["question_text"].lower()
 
     q8 = await orch.loop(state, "details about kafka on Kubernetes")
     assert q8["question_type"] == "targeted_followup"
-    assert "Kubernetes" in q8["question_text"]
+    assert "kubernetes" in q8["question_text"].lower()
 
-    q9 = await orch.loop(state, "k8s follow-up response")
+    q9 = await orch.loop(state, "k8s follow-up response with details")
     assert q9["question_type"] == "warmup_constraints"
+    assert state.packet.resolved_followup_hooks == ["kafka", "kubernetes"]
+
+
+@pytest.mark.asyncio
+async def test_followup_skipped_when_explained(monkeypatch):
+    async def fake_execute(task_name, system_prompt, user_prompt=None):
+        if task_name == "stage_0_analysis":
+            return {
+                "role_from_jd": "backend",
+                "jd_core_skills": [],
+                "resume_claims": [],
+                "overlap_skills": [],
+                "primary_overlap_focus": "backend",
+            }
+        if task_name == "skill_tag_refinement":
+            return {"tags": []}
+        if task_name == "question_generation":
+            return {"question_text": "q"}
+        if task_name == "stage_1_parse":
+            if "project name" in system_prompt:
+                return {"project_name": "demo"}
+            if "goal" in system_prompt:
+                return {"goal": "demo", "constraints": []}
+            if "role and team_size" in system_prompt:
+                if "lead" in (user_prompt or "").lower():
+                    return {"role": "lead", "team_size": None}
+                if "5" in (user_prompt or ""):
+                    return {"role": None, "team_size": "5"}
+            if "architecture" in system_prompt:
+                if "svc" in (user_prompt or ""):
+                    return {"architecture": "svc", "key_technologies": [], "followup_hooks": []}
+                return {"architecture": None, "key_technologies": [], "followup_hooks": []}
+            if "constraints" in system_prompt and "list" in system_prompt:
+                return {"constraints": ["latency"]}
+        raise AssertionError(task_name)
+
+    monkeypatch.setattr(ai.gateway, "execute_task", fake_execute)
+
+    packet = await ai.analyze_jd_resume("JD", "Resume")
+    state = InterviewState(packet)
+    orch = Orchestrator()
+
+    await orch.loop(state)
+    await orch.loop(state, "demo project")
+    await orch.loop(state, "overview")
+    await orch.loop(state, "lead")
+    await orch.loop(state, "5")
+    await orch.loop(state, "svc")
+
+    q7 = await orch.loop(state, "Kafka")
+    assert q7["question_type"] == "targeted_followup"
+
+    q8 = await orch.loop(
+        state,
+        "We used Kafka and Kubernetes to orchestrate microservices and manage scaling efficiently",
+    )
+    assert q8["question_type"] == "warmup_constraints"
+    assert state.packet.resolved_followup_hooks == ["kafka", "kubernetes"]
 
 
 @pytest.mark.asyncio
