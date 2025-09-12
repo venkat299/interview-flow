@@ -35,10 +35,6 @@ from .programs.stage1_warmup import (
     WarmupReflectionProgram,
     WarmupReflectionInput,
 )
-from .programs.stage2_evidence import (
-    EvidenceProgram,
-    EvidenceInput,
-)
 from .programs.stage3_theory import (
     TheoryQuestionProgram,
     TheoryQuestionInput,
@@ -211,7 +207,6 @@ _interviewer = LLMInterviewer()
 _monitor = LLMMonitor()
 _scoring = ScoringEngine()
 _stage0 = Stage0AnalysisProgram()
-_evidence = EvidenceProgram()
 _theory_question = TheoryQuestionProgram()
 _theory_eval = TheoryEvalProgram()
 _wrap_up = WrapUpProgram()
@@ -447,32 +442,107 @@ async def evidence_components(
     return None
 
 
-async def evidence_skill_task(
+async def evidence_choice_space(
     packet: ContextPacket, answer: Optional[str] = None
 ) -> Optional[dict]:
-    """Stage-2 step: gather skill confidence from a task description."""
-
-    skills = packet.overlap_skills or packet.jd_core_skills
-    if packet.role_skill_tags:
-        skills = list(dict.fromkeys(list(packet.role_skill_tags) + list(skills)))
+    """Stage-2 step: ask about considered options or approaches."""
 
     if answer is None:
-        skill_list = ", ".join(skills)
         system_prompt = (
-            "You are an AI technical interviewer. Ask the candidate to describe one concrete task they completed and to rate their confidence (1-5) for each of these skills: "
-            f"{skill_list}. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
+            "You are an AI technical interviewer. Ask the candidate what options or approaches they considered for the chosen project. "
+            "The question must be brief and request a concise response. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
         )
         data = await gateway.execute_task(
             task_name="question_generation",
             system_prompt=system_prompt,
         )
-        _decrement_time(packet, 2)
-        return {"question_text": data["question_text"], "question_type": "evidence_skill_task"}
+        _decrement_time(packet, 1)
+        return {"question_text": data["question_text"], "question_type": "evidence_choice_space"}
 
-    out = await _evidence(EvidenceInput(answer=answer))
-    packet.skill_hooks = out.skill_hooks
-    packet.confidence_ratings.update(out.confidence_ratings)
-    packet.notes.extend(out.notes)
+    data = await gateway.execute_task(
+        task_name="stage_2_parse",
+        system_prompt='Extract the options or approaches mentioned as short notes. Respond with JSON {"notes": [string]}.' ,
+        user_prompt=answer,
+    )
+    packet.notes.extend([f"Choice space: {n}" for n in data.get("notes", [])])
+    return None
+
+
+async def evidence_decision_rationale(
+    packet: ContextPacket, answer: Optional[str] = None
+) -> Optional[dict]:
+    """Stage-2 step: probe why a specific option was chosen."""
+
+    if answer is None:
+        system_prompt = (
+            "You are an AI technical interviewer. Ask the candidate to briefly explain why they chose a particular option from the ones considered. "
+            "Keep the question concise and expect a short answer. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
+        )
+        data = await gateway.execute_task(
+            task_name="question_generation",
+            system_prompt=system_prompt,
+        )
+        _decrement_time(packet, 1)
+        return {"question_text": data["question_text"], "question_type": "evidence_decision_rationale"}
+
+    data = await gateway.execute_task(
+        task_name="stage_2_parse",
+        system_prompt='Summarize the candidate\'s rationale in under 10 words. Respond with JSON {"notes": [string]}.' ,
+        user_prompt=answer,
+    )
+    packet.notes.extend([f"Rationale: {n}" for n in data.get("notes", [])])
+    return None
+
+
+async def evidence_outcome_validation(
+    packet: ContextPacket, answer: Optional[str] = None
+) -> Optional[dict]:
+    """Stage-2 step: request evidence that the choice worked."""
+
+    if answer is None:
+        system_prompt = (
+            "You are an AI technical interviewer. Ask the candidate for brief evidence that their chosen option succeeded. "
+            "The question must be concise. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
+        )
+        data = await gateway.execute_task(
+            task_name="question_generation",
+            system_prompt=system_prompt,
+        )
+        _decrement_time(packet, 1)
+        return {"question_text": data["question_text"], "question_type": "evidence_outcome_validation"}
+
+    data = await gateway.execute_task(
+        task_name="stage_2_parse",
+        system_prompt='List the pieces of evidence that the choice worked. Respond with JSON {"notes": [string]}.' ,
+        user_prompt=answer,
+    )
+    packet.notes.extend([f"Outcome: {n}" for n in data.get("notes", [])])
+    return None
+
+
+async def evidence_tradeoff_reflection(
+    packet: ContextPacket, answer: Optional[str] = None
+) -> Optional[dict]:
+    """Stage-2 step: explore trade-offs or alternative paths."""
+
+    if answer is None:
+        system_prompt = (
+            "You are an AI technical interviewer. Ask the candidate to reflect on trade-offs or alternative paths they considered and why those were not chosen. "
+            "Keep it brief and expect a concise answer. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
+        )
+        data = await gateway.execute_task(
+            task_name="question_generation",
+            system_prompt=system_prompt,
+        )
+        _decrement_time(packet, 1)
+        return {"question_text": data["question_text"], "question_type": "evidence_tradeoff_reflection"}
+
+    data = await gateway.execute_task(
+        task_name="stage_2_parse",
+        system_prompt='Summarize the trade-offs or alternatives mentioned. Respond with JSON {"notes": [string]}.' ,
+        user_prompt=answer,
+    )
+    packet.notes.extend([f"Trade-offs: {n}" for n in data.get("notes", [])])
     return None
 
 

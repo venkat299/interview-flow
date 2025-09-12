@@ -87,15 +87,24 @@ async def test_run_interview_end_to_end(monkeypatch):
     assert q8["question_type"] == "evidence_components"
 
     q9 = await orch.loop(state, "component details")
-    assert q9["question_type"] == "evidence_skill_task"
+    assert q9["question_type"] == "evidence_choice_space"
 
-    q10 = await orch.loop(state, "task details confidence 5")
-    assert q10["question_type"] == "theory_check"
+    q10 = await orch.loop(state, "considered options")
+    assert q10["question_type"] == "evidence_decision_rationale"
 
-    q11 = await orch.loop(state, "A language")
-    assert q11["question_type"] == "wrapup_closure"
+    q11 = await orch.loop(state, "selected because")
+    assert q11["question_type"] == "evidence_outcome_validation"
 
-    q12 = await orch.loop(state, "No questions")
-    assert q12 is None
+    q12 = await orch.loop(state, "it worked")
+    assert q12["question_type"] == "evidence_tradeoff_reflection"
+
+    q13 = await orch.loop(state, "tradeoffs considered")
+    assert q13["question_type"] == "theory_check"
+
+    q14 = await orch.loop(state, "A language")
+    assert q14["question_type"] == "wrapup_closure"
+
+    q15 = await orch.loop(state, "No questions")
+    assert q15 is None
     assert state.packet.time_remaining_min == 0
 
