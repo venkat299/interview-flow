@@ -16,6 +16,7 @@ dependencies = [
     "fpdf2>=2.7.0",
     "dspy-ai>=3.0.0",
     "langgraph>=0.6.7",
+    "json-repair>=0.50.1",
 ]
 
 [project.optional-dependencies]
