@@ -20,6 +20,7 @@ from .llm_api import (
     wrapup_candidate_questions,
     wrapup_feedback,
 )
+from .followups import build_followup_question
 from session_service.question_log_db import log_question_response
 
 
@@ -31,6 +32,33 @@ class Orchestrator:
     ) -> Optional[dict]:
         packet = state.packet
         phase = state.current_phase
+
+        # Handle answer to a targeted follow-up probe
+        if answer is not None and getattr(state, "last_question_type", None) == "targeted_followup":
+            log_question_response(
+                stage=phase,
+                question_type="targeted_followup",
+                question_text=getattr(state, "last_question_text", ""),
+                answer_text=answer,
+                session_id=getattr(state, "session_id", None),
+                candidate_id=getattr(state, "candidate_id", None),
+            )
+            return await self.decide_next_action(state, None)
+
+        # Insert targeted follow-up questions when hooks are present
+        if answer is None:
+            pending = [
+                h
+                for h in packet.followup_hooks
+                if h not in state.probed_followup_hooks
+            ]
+            for hook in pending:
+                q_text = build_followup_question(hook)
+                state.probed_followup_hooks.add(hook)
+                if q_text:
+                    state.last_question_text = q_text
+                    state.last_question_type = "targeted_followup"
+                    return {"question_text": q_text, "question_type": "targeted_followup"}
 
         if phase == "warm_up":
             if answer is not None and getattr(state, "last_question_text", None):

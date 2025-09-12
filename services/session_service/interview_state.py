@@ -55,6 +55,7 @@ class InterviewState:
         # Track the last question asked to pair with the next answer
         self.last_question_text: Optional[str] = None
         self.last_question_type: Optional[str] = None
+        self.probed_followup_hooks: set[str] = set()
 
 
     @property
