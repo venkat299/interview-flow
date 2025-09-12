@@ -25,8 +25,13 @@ class InterviewState:
         "outcome_validation",
         "tradeoff_reflection",
     ]
+    theory_steps: List[str] = [
+        "primary",
+        "follow_up",
+    ]
     wrapup_steps: List[str] = [
-        "closure",
+        "candidate_questions",
+        "feedback",
     ]
 
     def __init__(
@@ -40,6 +45,8 @@ class InterviewState:
         # Stage-based step indexes
         self.warmup_index = 0
         self.evidence_index = 0
+        self.theory_index = 0
+        self.theory_skill_index = 0
         self.wrapup_index = 0
 
         # Metadata for logging
@@ -78,8 +85,21 @@ class InterviewState:
         if self.evidence_index < len(self.evidence_steps) - 1:
             self.evidence_index += 1
         else:
-            self.evidence_index += 1
             self.advance_phase()
+
+    @property
+    def current_theory_step(self) -> str:
+        return self.theory_steps[self.theory_index]
+
+    def advance_theory_step(self) -> None:
+        if self.theory_index < len(self.theory_steps) - 1:
+            self.theory_index += 1
+        else:
+            self.theory_index = 0
+            self.theory_skill_index += 1
+            skills = self.packet.skill_hooks or self.packet.jd_core_skills
+            if self.theory_skill_index >= len(skills):
+                self.advance_phase()
 
     @property
     def current_wrapup_step(self) -> str:
