@@ -59,16 +59,6 @@ class Orchestrator:
             return q
 
         if phase == "evidence":
-
-            if answer is not None and getattr(state, "last_question_text", None):
-                log_question_response(
-                    stage=phase,
-                    question_type=getattr(state, "last_question_type", ""),
-                    question_text=getattr(state, "last_question_text", ""),
-                    answer_text=answer,
-                    session_id=getattr(state, "session_id", None),
-                    candidate_id=getattr(state, "candidate_id", None),
-                )
             step = state.current_evidence_step
             func_map = {
                 "components": evidence_components,
@@ -78,6 +68,16 @@ class Orchestrator:
                 "tradeoff_reflection": evidence_tradeoff_reflection,
             }
             q = await func_map[step](packet, answer)
+
+            if answer is not None and getattr(state, "last_question_text", None):
+                log_question_response(
+                    stage="evidence",
+                    question_type=step,
+                    question_text=getattr(state, "last_question_text", ""),
+                    answer_text=answer,
+                    session_id=getattr(state, "session_id", None),
+                    candidate_id=getattr(state, "candidate_id", None),
+                )
 
             if q is None:
                 state.advance_evidence_step()
