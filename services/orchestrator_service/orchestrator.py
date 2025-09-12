@@ -159,6 +159,7 @@ class Orchestrator:
             }
             if step == "closing":
                 q = await func_map[step](packet)
+                # Log the final closing prompt even though no answer is expected
                 log_question_response(
                     stage=phase,
                     question_type=step,

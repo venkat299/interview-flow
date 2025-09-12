@@ -37,7 +37,11 @@ def log_question_response(
     candidate_id: Optional[str] = None,
     db_path: Path = DB_PATH,
 ) -> None:
-    """Persist a single question/answer pair to the log database."""
+    """Persist a single question/answer pair to the log database.
+
+    ``answer_text`` may be an empty string for prompts that do not expect a
+    response (e.g., closing messages).
+    """
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
     cur.execute(
