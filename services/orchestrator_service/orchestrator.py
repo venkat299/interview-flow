@@ -14,11 +14,13 @@ from .llm_api import (
     warmup_resolution,
     warmup_outcome,
     warmup_reflection,
-    evidence_components,
+    evidence_components_list,
+    evidence_component_details,
     evidence_choice_space,
     evidence_decision_rationale,
     evidence_outcome_validation,
-    evidence_tradeoff_reflection,
+    evidence_tradeoff_exploration,
+    evidence_tradeoff_reasoning,
     theory_primary_question,
     theory_followup_question,
     wrapup_feedback,
@@ -102,18 +104,20 @@ class Orchestrator:
         if phase == "evidence":
             step = state.current_evidence_step
             func_map = {
-                "components": evidence_components,
+                "components_list": evidence_components_list,
+                "component_details": evidence_component_details,
                 "choice_space": evidence_choice_space,
                 "decision_rationale": evidence_decision_rationale,
                 "outcome_validation": evidence_outcome_validation,
-                "tradeoff_reflection": evidence_tradeoff_reflection,
+                "tradeoff_exploration": evidence_tradeoff_exploration,
+                "tradeoff_reasoning": evidence_tradeoff_reasoning,
             }
             q = await func_map[step](packet, answer)
 
             if answer is not None and getattr(state, "last_question_text", None):
                 log_question_response(
                     stage="evidence",
-                    question_type=step,
+                    question_type=getattr(state, "last_question_type", ""),
                     question_text=getattr(state, "last_question_text", ""),
                     answer_text=answer,
                     session_id=getattr(state, "session_id", None),

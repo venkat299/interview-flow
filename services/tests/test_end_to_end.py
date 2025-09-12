@@ -104,33 +104,39 @@ async def test_run_interview_end_to_end(monkeypatch):
     assert q11["question_type"] == "warmup_reflection"
 
     q12 = await orch.loop(state, "better tests")
-    assert q12["question_type"] == "evidence_components"
+    assert q12["question_type"] == "evidence_components_list"
 
-    q13 = await orch.loop(state, "component details")
-    assert q13["question_type"] == "evidence_choice_space"
+    q13 = await orch.loop(state, "listed components")
+    assert q13["question_type"] == "evidence_component_details"
 
-    q14 = await orch.loop(state, "considered options")
-    assert q14["question_type"] == "evidence_decision_rationale"
+    q14 = await orch.loop(state, "component details")
+    assert q14["question_type"] == "evidence_choice_space"
 
-    q15 = await orch.loop(state, "selected because")
-    assert q15["question_type"] == "evidence_outcome_validation"
+    q15 = await orch.loop(state, "considered options")
+    assert q15["question_type"] == "evidence_decision_rationale"
 
-    q16 = await orch.loop(state, "it worked")
-    assert q16["question_type"] == "evidence_tradeoff_reflection"
+    q16 = await orch.loop(state, "selected because")
+    assert q16["question_type"] == "evidence_outcome_validation"
 
-    q17 = await orch.loop(state, "tradeoffs considered")
-    assert q17["question_type"] == "theory_primary"
+    q17 = await orch.loop(state, "it worked")
+    assert q17["question_type"] == "evidence_tradeoff_exploration"
 
-    q18 = await orch.loop(state, "A language")
-    assert q18["question_type"] == "theory_followup"
+    q18 = await orch.loop(state, "tradeoffs considered")
+    assert q18["question_type"] == "evidence_tradeoff_reasoning"
 
-    q19 = await orch.loop(state, "deeper answer")
-    assert q19["question_type"] == "wrapup_feedback"
+    q19 = await orch.loop(state, "why chosen")
+    assert q19["question_type"] == "theory_primary"
 
-    q20 = await orch.loop(state, "All good")
-    assert q20["question_type"] == "wrapup_closing"
+    q20 = await orch.loop(state, "A language")
+    assert q20["question_type"] == "theory_followup"
 
-    q21 = await orch.loop(state)
-    assert q21 is None
+    q21 = await orch.loop(state, "deeper answer")
+    assert q21["question_type"] == "wrapup_feedback"
+
+    q22 = await orch.loop(state, "All good")
+    assert q22["question_type"] == "wrapup_closing"
+
+    q23 = await orch.loop(state)
+    assert q23 is None
     assert state.packet.time_remaining_min == 0
 
