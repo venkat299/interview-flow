@@ -84,6 +84,7 @@ async def test_keyword_followup_injected(monkeypatch):
         state,
         "Our Kubernetes deployment handled scaling, monitoring, and updates without downtime",
     )
+
     assert q9["question_type"] == "warmup_constraints"
     assert state.packet.resolved_followup_hooks == ["kafka", "kubernetes"]
 

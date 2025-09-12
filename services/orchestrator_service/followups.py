@@ -59,7 +59,6 @@ def _has_explanation(text: str, hook: str, min_follow_words: int = 3) -> bool:
     after = lowered[idx + len(hook) :].split()
     return len(after) >= min_follow_words
 
-
 def update_followup_hooks(
     packet: ContextPacket, answer: str, addressed_hook: str | None = None
 ) -> None:
@@ -77,4 +76,5 @@ def update_followup_hooks(
 
     if addressed_hook and addressed_hook not in packet.resolved_followup_hooks:
         if _is_substantive(answer):
+
             packet.resolved_followup_hooks.append(addressed_hook)
