@@ -14,6 +14,7 @@ import re
 
 import httpx
 import yaml
+from json_repair import repair_json
 
 from .config import settings
 
@@ -267,6 +268,13 @@ class AIGateway:
             except Exception:
                 pass
 
+        # 4) attempt to repair malformed JSON
+        try:
+            repaired = repair_json(text)
+            return json.loads(repaired)
+        except Exception:
+            pass
+
         return None
 
     @staticmethod
@@ -280,6 +288,8 @@ class AIGateway:
         text = re.sub(r"<\|[^|>]+\|>", " ", text)
         # Remove labels like 'final', 'JSON', 'message' at the start if present
         text = re.sub(r"^(?:\s*(?:final|json|message|output|result)\s*[:\-]?\s*)+", "", text, flags=re.IGNORECASE)
+        # Normalize smart quotes
+        text = text.replace("“", "\"").replace("”", "\"")
         return text.strip()
 
     @staticmethod
