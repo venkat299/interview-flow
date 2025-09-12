@@ -12,8 +12,8 @@ from .schemas import ContextPacket
 # Mapping from lowercase keyword to question template. The template may
 # reference ``{keyword}`` to inject the matched term.
 FOLLOWUP_TEMPLATES: Dict[str, str] = {
-    "kafka": "You mentioned Kafka earlier. How did you use Kafka in the project?",
-    "kubernetes": "You mentioned Kubernetes. What challenges did you face managing deployments on Kubernetes?",
+    "kafka": "How did you use {keyword} in the project?",
+    "kubernetes": "What challenges did you face managing deployments on {keyword}?",
 }
 
 
@@ -39,13 +39,42 @@ def build_followup_question(keyword: str) -> str | None:
     template = FOLLOWUP_TEMPLATES.get(keyword.lower())
     if not template:
         return None
-    return template.format(keyword=keyword)
+    return (
+        f"You mentioned {keyword} earlier but didn't elaborate. "
+        f"{template.format(keyword=keyword)}"
+    )
 
 
-def update_followup_hooks(packet: ContextPacket, answer: str) -> None:
-    """Scan ``answer`` for keywords and append to packet hooks."""
-    for hook in extract_followup_hooks(answer):
+def _is_substantive(text: str, threshold: int = 8) -> bool:
+    """Heuristic check if ``text`` seems like an explanation."""
+    return len(text.split()) >= threshold
+
+
+def _has_explanation(text: str, hook: str, min_follow_words: int = 3) -> bool:
+    """Return True if ``text`` includes at least ``min_follow_words`` after ``hook``."""
+    lowered = text.lower()
+    idx = lowered.find(hook.lower())
+    if idx == -1:
+        return False
+    after = lowered[idx + len(hook) :].split()
+    return len(after) >= min_follow_words
+
+
+def update_followup_hooks(
+    packet: ContextPacket, answer: str, addressed_hook: str | None = None
+) -> None:
+    """Scan ``answer`` for keywords, update hooks, and mark resolved ones."""
+
+    hooks_in_answer = extract_followup_hooks(answer)
+
+    for hook in hooks_in_answer:
         if hook not in packet.followup_hooks:
             packet.followup_hooks.append(hook)
         if hook not in packet.project_context.followup_hooks:
             packet.project_context.followup_hooks.append(hook)
+        if _has_explanation(answer, hook) and hook not in packet.resolved_followup_hooks:
+            packet.resolved_followup_hooks.append(hook)
+
+    if addressed_hook and addressed_hook not in packet.resolved_followup_hooks:
+        if _is_substantive(answer):
+            packet.resolved_followup_hooks.append(addressed_hook)

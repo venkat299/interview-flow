@@ -62,6 +62,7 @@ class InterviewState:
         self.last_question_text: Optional[str] = None
         self.last_question_type: Optional[str] = None
         self.probed_followup_hooks: set[str] = set()
+        self.last_followup_hook: Optional[str] = None
 
 
     @property

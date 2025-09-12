@@ -50,7 +50,8 @@ class Orchestrator:
                 candidate_id=getattr(state, "candidate_id", None),
             )
 
-            update_followup_hooks(packet, answer)
+            update_followup_hooks(packet, answer, addressed_hook=state.last_followup_hook)
+            state.last_followup_hook = None
 
             return await self.decide_next_action(state, None)
 
@@ -60,6 +61,7 @@ class Orchestrator:
                 h
                 for h in packet.followup_hooks
                 if h not in state.probed_followup_hooks
+                and h not in packet.resolved_followup_hooks
             ]
             for hook in pending:
                 q_text = build_followup_question(hook)
@@ -67,6 +69,7 @@ class Orchestrator:
                 if q_text:
                     state.last_question_text = q_text
                     state.last_question_type = "targeted_followup"
+                    state.last_followup_hook = hook
                     return {"question_text": q_text, "question_type": "targeted_followup"}
 
         if phase == "warm_up":

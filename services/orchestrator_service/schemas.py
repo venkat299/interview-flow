@@ -122,6 +122,7 @@ class ContextPacket(BaseModel):
     project_context: ProjectContext = Field(default_factory=ProjectContext)
     skill_hooks: List[str] = Field(default_factory=list)
     followup_hooks: List[str] = Field(default_factory=list)
+    resolved_followup_hooks: List[str] = Field(default_factory=list)
     verifications: List[VerificationResult] = Field(default_factory=list)
     notes: List[str] = Field(default_factory=list)
     role_skill_tags: List[str] = Field(default_factory=list)
