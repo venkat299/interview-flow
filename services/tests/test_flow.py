@@ -26,6 +26,8 @@ async def test_run_interview_flow(monkeypatch):
             return {
                 "skill_hooks": ["python", "db"],
                 "notes": ["api work"],
+                "evaluation_metrics": {"latency": "100ms"},
+                "followup_hooks": ["redis"],
             }
         if task_name == "stage_3_question":
             if "python" in system_prompt:
@@ -51,14 +53,14 @@ async def test_run_interview_flow(monkeypatch):
 
     assert result.project_context.goal == "demo"
     assert result.skill_hooks == ["python", "db"]
-    assert [v.skill for v in result.verifications] == ["python", "db"]
+    assert result.followup_hooks == ["redis"]
+    assert result.project_context.evaluation_metrics == {"latency": "100ms"}
+    assert [v.skill for v in result.verifications] == ["redis"]
     assert call_order == [
         "stage_0_analysis",
         "stage_1_parse",
         "stage_1_parse",
         "stage_2_parse",
-        "stage_3_question",
-        "stage_3_eval",
         "stage_3_question",
         "stage_3_eval",
         "stage_4_summary",

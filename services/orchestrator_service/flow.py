@@ -48,22 +48,27 @@ async def stage2_evidence_node(state: InterviewState) -> dict:
     """Extract evidence details from candidate answer."""
     answer = state.notes[-1] if state.notes else ""
     output = await EvidenceProgram()(EvidenceInput(answer=answer))
+    ctx = state.project_context.model_copy()
+    ctx.evaluation_metrics.update(output.evaluation_metrics)
     return {
         "skill_hooks": output.skill_hooks,
+        "followup_hooks": state.followup_hooks + output.followup_hooks,
         "notes": state.notes + output.notes,
+        "project_context": ctx.model_dump(),
     }
 
 
 async def stage3_theory_node(state: InterviewState) -> dict:
     """Run a theory check on each collected skill in sequence."""
-    if not state.skill_hooks:
+    skills = state.followup_hooks or state.skill_hooks
+    if not skills:
         return {}
 
     idx = len(state.verifications)
-    if idx >= len(state.skill_hooks):
+    if idx >= len(skills):
         return {}
 
-    skill = state.skill_hooks[idx]
+    skill = skills[idx]
     question = await TheoryQuestionProgram()(TheoryQuestionInput(skill=skill))
     eval_result = await TheoryEvalProgram()(TheoryEvalInput(answer=""))
     verification = VerificationResult(
@@ -96,7 +101,7 @@ def build_interview_graph() -> StateGraph:
     graph.add_edge("stage2_evidence", "stage3_theory")
 
     def _more_theory(state: InterviewState) -> str:
-        skills = state.skill_hooks or state.jd_core_skills
+        skills = state.followup_hooks or state.skill_hooks or state.jd_core_skills
         return "again" if len(state.verifications) < len(skills) else "done"
 
     graph.add_conditional_edges(

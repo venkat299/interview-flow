@@ -1,5 +1,5 @@
 """Pydantic models for the interview module."""
-from typing import List, Optional
+from typing import Dict, List, Optional
 from pydantic import BaseModel, Field
 
 
@@ -80,6 +80,8 @@ class ProjectContext(BaseModel):
     team_size: Optional[str] = None
     architecture: Optional[str] = None
     key_technologies: List[str] = Field(default_factory=list)
+    evaluation_metrics: Dict[str, str] = Field(default_factory=dict)
+    followup_hooks: List[str] = Field(default_factory=list)
     hardest_challenge: Optional[str] = None
     outcomes: Optional[str] = None
     lessons: Optional[str] = None
@@ -91,6 +93,15 @@ class VerificationResult(BaseModel):
     skill: str
     result: str
     rationale: Optional[str] = None
+
+
+class EvidenceOutput(BaseModel):
+    """Parsed skill hooks, metrics, follow-up hooks, and notes."""
+
+    skill_hooks: List[str] = Field(default_factory=list)
+    notes: List[str] = Field(default_factory=list)
+    evaluation_metrics: Dict[str, str] = Field(default_factory=dict)
+    followup_hooks: List[str] = Field(default_factory=list)
 
 
 class ContextPacket(BaseModel):
@@ -108,6 +119,7 @@ class ContextPacket(BaseModel):
     selected_project: Optional[str] = None
     project_context: ProjectContext = Field(default_factory=ProjectContext)
     skill_hooks: List[str] = Field(default_factory=list)
+    followup_hooks: List[str] = Field(default_factory=list)
     verifications: List[VerificationResult] = Field(default_factory=list)
     notes: List[str] = Field(default_factory=list)
     role_skill_tags: List[str] = Field(default_factory=list)

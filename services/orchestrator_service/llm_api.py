@@ -225,11 +225,14 @@ def _skill_prompt_context(packet: ContextPacket) -> str:
 
     tags = ", ".join(packet.role_skill_tags[:5])
     hooks = ", ".join(packet.skill_hooks[:3])
+    followups = ", ".join(packet.followup_hooks[:3])
     parts = []
     if tags:
         parts.append(f"technologies like {tags}")
     if hooks:
         parts.append(f"constraints such as {hooks}")
+    if followups:
+        parts.append(f"topics such as {followups}")
     return (" involving " + " and ".join(parts)) if parts else ""
 
 
@@ -343,6 +346,8 @@ async def warmup_architecture(
     data = await WarmupArchitectureProgram()(WarmupArchitectureInput(answer=answer))
     packet.project_context.architecture = data.architecture
     packet.project_context.key_technologies = data.key_technologies
+    packet.project_context.followup_hooks = data.followup_hooks
+    packet.followup_hooks.extend(h for h in data.followup_hooks if h not in packet.followup_hooks)
     return None
 
 
@@ -409,6 +414,7 @@ async def warmup_outcome(
 
     data = await WarmupOutcomeProgram()(WarmupOutcomeInput(answer=answer))
     packet.project_context.outcomes = data.outcomes
+    packet.project_context.evaluation_metrics = data.evaluation_metrics
     return None
 
 
