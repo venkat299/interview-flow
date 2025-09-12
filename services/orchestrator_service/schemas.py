@@ -93,6 +93,8 @@ class VerificationResult(BaseModel):
     skill: str
     result: str
     rationale: Optional[str] = None
+    followup_result: Optional[str] = None
+    followup_rationale: Optional[str] = None
 
 
 class EvidenceOutput(BaseModel):

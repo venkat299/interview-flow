@@ -570,7 +570,7 @@ async def evidence_tradeoff_reflection(
     return None
 
 
-async def theory_primary(
+async def theory_primary_question(
     packet: ContextPacket, skill: str, answer: Optional[str] = None
 ) -> Optional[dict]:
     """Stage-3 step: ask a primary theory question for a skill."""
@@ -587,27 +587,42 @@ async def theory_primary(
     return None
 
 
-async def theory_follow_up(
+async def theory_followup_question(
     packet: ContextPacket, skill: str, answer: Optional[str] = None
 ) -> Optional[dict]:
-    """Stage-3 step: follow-up question on the same skill."""
+    """Stage-3 step: follow-up question on the same skill.
+
+    The difficulty of the follow-up is based on the prior verification result.
+    """
 
     if answer is None:
-        system_prompt = (
-            f"You are verifying understanding of '{skill}'. Ask one concise follow-up question. "
-            'Respond with JSON {"question_text": string}.'
+        last = next(
+            (v for v in reversed(packet.verifications) if v.skill == skill),
+            None,
         )
+        if last and last.result == "pass":
+            system_prompt = (
+                f"You are verifying advanced understanding of '{skill}'. "
+                "Ask a harder follow-up question. Respond with JSON {\"question_text\": string}."
+            )
+        else:
+            rationale = last.rationale if last else ""
+            system_prompt = (
+                f"You are verifying understanding of '{skill}'. The candidate's previous answer was incorrect. "
+                f"Reference: {rationale}. Ask a follow-up question to address the misunderstanding. "
+                "Respond with JSON {\"question_text\": string}."
+            )
         data = await gateway.execute_task(
             task_name="stage_3_question",
             system_prompt=system_prompt,
         )
         _decrement_time(packet, 1)
-        return {"question_text": data["question_text"], "question_type": "theory_follow_up"}
+        return {"question_text": data["question_text"], "question_type": "theory_followup"}
 
     e_out = await _theory_eval(TheoryEvalInput(answer=answer))
-    packet.verifications.append(
-        VerificationResult(skill=skill, result=e_out.result, rationale=e_out.rationale)
-    )
+    if packet.verifications:
+        packet.verifications[-1].followup_result = e_out.result
+        packet.verifications[-1].followup_rationale = e_out.rationale
     return None
 
 

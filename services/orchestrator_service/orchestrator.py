@@ -15,8 +15,8 @@ from .llm_api import (
     evidence_decision_rationale,
     evidence_outcome_validation,
     evidence_tradeoff_reflection,
-    theory_primary,
-    theory_follow_up,
+    theory_primary_question,
+    theory_followup_question,
     wrapup_candidate_questions,
     wrapup_feedback,
 )
@@ -106,8 +106,8 @@ class Orchestrator:
             step = state.current_theory_step
             skill = skills[state.theory_skill_index]
             func_map = {
-                "primary": theory_primary,
-                "follow_up": theory_follow_up,
+                "primary": theory_primary_question,
+                "followup": theory_followup_question,
             }
             q = await func_map[step](packet, skill, answer)
             if q is None:
