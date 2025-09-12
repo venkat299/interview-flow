@@ -11,7 +11,10 @@ from .llm_api import (
     warmup_outcome,
     warmup_reflection,
     evidence_components,
-    evidence_skill_task,
+    evidence_choice_space,
+    evidence_decision_rationale,
+    evidence_outcome_validation,
+    evidence_tradeoff_reflection,
     theory_check_question,
     wrapup_closure,
 )
@@ -69,7 +72,10 @@ class Orchestrator:
             step = state.current_evidence_step
             func_map = {
                 "components": evidence_components,
-                "skill_task": evidence_skill_task,
+                "choice_space": evidence_choice_space,
+                "decision_rationale": evidence_decision_rationale,
+                "outcome_validation": evidence_outcome_validation,
+                "tradeoff_reflection": evidence_tradeoff_reflection,
             }
             q = await func_map[step](packet, answer)
 

@@ -20,7 +20,10 @@ class InterviewState:
     ]
     evidence_steps: List[str] = [
         "components",
-        "skill_task",
+        "choice_space",
+        "decision_rationale",
+        "outcome_validation",
+        "tradeoff_reflection",
     ]
     wrapup_steps: List[str] = [
         "closure",
