@@ -550,25 +550,53 @@ async def warmup_reflection(
     return None
 
 
-async def evidence_components(
+async def evidence_components_list(
     packet: ContextPacket, answer: Optional[str] = None
 ) -> Optional[dict]:
-    """Stage-2 step: ask about project components owned."""
+    """Stage-2 step: list key project components."""
 
     if answer is None:
         context = _skill_prompt_context(packet)
         system_prompt = (
-            "You are an AI technical interviewer asking the candidate to briefly list 2–3 major components they built on the selected project, noting each component's purpose and main interfaces"
+            "You are an AI technical interviewer asking the candidate to briefly list 2–3 major components they built on the selected project"
             f"{context}. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
         )
         data = await gateway.execute_task(
             task_name="question_generation",
             system_prompt=system_prompt,
         )
-        _decrement_time(packet, 2)
-        return {"question_text": data["question_text"], "question_type": "evidence_components"}
+        _decrement_time(packet, 1)
+        return {"question_text": data["question_text"], "question_type": "evidence_components_list"}
 
     packet.notes.append(f"Components: {answer}")
+    update_followup_hooks(packet, answer)
+    return None
+
+
+async def evidence_component_details(
+    packet: ContextPacket, answer: Optional[str] = None
+) -> Optional[dict]:
+    """Stage-2 step: detail one component's purpose and interfaces."""
+
+    if answer is None:
+        context = _skill_prompt_context(packet)
+        system_prompt = (
+            "You are an AI technical interviewer asking the candidate to pick one component and briefly describe its purpose and main interfaces"
+            f"{context}. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
+        )
+        data = await gateway.execute_task(
+            task_name="question_generation",
+            system_prompt=system_prompt,
+        )
+        _decrement_time(packet, 1)
+        return {"question_text": data["question_text"], "question_type": "evidence_component_details"}
+
+    data = await gateway.execute_task(
+        task_name="stage_2_parse",
+        system_prompt='Summarize the component\'s purpose and interfaces as short notes. Respond with JSON {"notes": [string]}.' ,
+        user_prompt=answer,
+    )
+    packet.notes.extend([f"Component details: {n}" for n in data.get("notes", [])])
     update_followup_hooks(packet, answer)
     return None
 
@@ -657,15 +685,15 @@ async def evidence_outcome_validation(
     return None
 
 
-async def evidence_tradeoff_reflection(
+async def evidence_tradeoff_exploration(
     packet: ContextPacket, answer: Optional[str] = None
 ) -> Optional[dict]:
-    """Stage-2 step: explore trade-offs or alternative paths."""
+    """Stage-2 step: surface trade-offs or alternatives considered."""
 
     if answer is None:
         context = _skill_prompt_context(packet)
         system_prompt = (
-            "You are an AI technical interviewer asking the candidate to reflect on trade-offs or alternative paths they considered and why those were not chosen"
+            "You are an AI technical interviewer asking the candidate what trade-offs or alternative paths they considered"
             f"{context}. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
         )
         data = await gateway.execute_task(
@@ -673,14 +701,42 @@ async def evidence_tradeoff_reflection(
             system_prompt=system_prompt,
         )
         _decrement_time(packet, 1)
-        return {"question_text": data["question_text"], "question_type": "evidence_tradeoff_reflection"}
+        return {"question_text": data["question_text"], "question_type": "evidence_tradeoff_exploration"}
 
     data = await gateway.execute_task(
         task_name="stage_2_parse",
-        system_prompt='Summarize the trade-offs or alternatives mentioned. Respond with JSON {"notes": [string]}.' ,
+        system_prompt='List the trade-offs or alternatives mentioned. Respond with JSON {"notes": [string]}.' ,
         user_prompt=answer,
     )
     packet.notes.extend([f"Trade-offs: {n}" for n in data.get("notes", [])])
+    update_followup_hooks(packet, answer)
+    return None
+
+
+async def evidence_tradeoff_reasoning(
+    packet: ContextPacket, answer: Optional[str] = None
+) -> Optional[dict]:
+    """Stage-2 step: why the chosen approach prevailed."""
+
+    if answer is None:
+        context = _skill_prompt_context(packet)
+        system_prompt = (
+            "You are an AI technical interviewer asking the candidate why the chosen approach prevailed over the alternatives"
+            f"{context}. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
+        )
+        data = await gateway.execute_task(
+            task_name="question_generation",
+            system_prompt=system_prompt,
+        )
+        _decrement_time(packet, 1)
+        return {"question_text": data["question_text"], "question_type": "evidence_tradeoff_reasoning"}
+
+    data = await gateway.execute_task(
+        task_name="stage_2_parse",
+        system_prompt='Summarize the reasoning for the chosen approach. Respond with JSON {"notes": [string]}.' ,
+        user_prompt=answer,
+    )
+    packet.notes.extend([f"Trade-off reasoning: {n}" for n in data.get("notes", [])])
     update_followup_hooks(packet, answer)
     return None
 

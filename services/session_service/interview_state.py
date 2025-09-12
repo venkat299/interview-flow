@@ -23,11 +23,13 @@ class InterviewState:
         "reflection",
     ]
     evidence_steps: List[str] = [
-        "components",
+        "components_list",
+        "component_details",
         "choice_space",
         "decision_rationale",
         "outcome_validation",
-        "tradeoff_reflection",
+        "tradeoff_exploration",
+        "tradeoff_reasoning",
     ]
     theory_steps: List[str] = [
         "primary",
