@@ -206,7 +206,7 @@ class AIGateway:
 
         # Best-effort fallback for simple question tasks
         if task_name == "question_generation":
-            return {"question_text": content.strip()}
+            return {"question_text": self._clean_text(content).strip()}
 
         # Graceful fallbacks for structured tasks when providers emit non-JSON text
         if task_name == "blueprint_generation":
