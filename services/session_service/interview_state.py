@@ -97,7 +97,11 @@ class InterviewState:
         else:
             self.theory_index = 0
             self.theory_skill_index += 1
-            skills = self.packet.skill_hooks or self.packet.jd_core_skills
+            skills = (
+                self.packet.followup_hooks
+                or self.packet.skill_hooks
+                or self.packet.jd_core_skills
+            )
             if self.theory_skill_index >= len(skills):
                 self.advance_phase()
 

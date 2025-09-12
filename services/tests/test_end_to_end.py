@@ -30,13 +30,13 @@ async def test_run_interview_end_to_end(monkeypatch):
             if "team_size" in system_prompt:
                 return {"role": "lead", "team_size": "5"}
             if "architecture" in system_prompt:
-                return {"architecture": "svc", "key_technologies": ["python"]}
+                return {"architecture": "svc", "key_technologies": ["python"], "followup_hooks": ["redis"]}
             if "constraints" in system_prompt and "list" in system_prompt:
                 return {"constraints": ["latency"]}
             if "hardest_challenge" in system_prompt or "challenge" in system_prompt:
                 return {"hardest_challenge": "scaling"}
             if "outcomes" in system_prompt or "metrics" in system_prompt:
-                return {"outcomes": "100rps"}
+                return {"outcomes": "100rps", "evaluation_metrics": {"throughput": "100rps"}}
             if "lessons" in system_prompt or "reflection" in system_prompt:
                 return {"lessons": "tests"}
             return {"goal": "demo"}
@@ -44,6 +44,8 @@ async def test_run_interview_end_to_end(monkeypatch):
             return {
                 "skill_hooks": ["python"],
                 "notes": ["api work"],
+                "evaluation_metrics": {"latency": "100ms"},
+                "followup_hooks": ["redis"],
             }
         if task_name == "question_generation":
             return {"question_text": "components?"}

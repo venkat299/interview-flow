@@ -1,12 +1,11 @@
 """DSPy program for Stage-2 evidence parsing."""
 from __future__ import annotations
 
-from typing import List
-
 import dspy
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from gateway_service import gateway
+from ..schemas import EvidenceOutput
 
 
 class EvidenceInput(BaseModel):
@@ -15,19 +14,14 @@ class EvidenceInput(BaseModel):
     answer: str
 
 
-class EvidenceOutput(BaseModel):
-    """Parsed skill hooks and notes."""
-
-    skill_hooks: List[str] = Field(default_factory=list)
-    notes: List[str] = Field(default_factory=list)
-
-
 class EvidenceProgram(dspy.Module):
     """Parse Stage-2 evidence answers into structured data."""
 
     system_prompt: str = (
         "From the answer, extract:"
         " skill_hooks (list of 3-5 concise items to verify later),"
+        " evaluation_metrics (object of metric name to value),"
+        " followup_hooks (list of technology keywords),"
         " and notes (brief bullets)."
         " Respond with JSON containing these keys."
     )

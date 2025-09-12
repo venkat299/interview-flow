@@ -99,7 +99,7 @@ class Orchestrator:
                     session_id=getattr(state, "session_id", None),
                     candidate_id=getattr(state, "candidate_id", None),
                 )
-            skills = packet.skill_hooks or packet.jd_core_skills
+            skills = packet.followup_hooks or packet.skill_hooks or packet.jd_core_skills
             if state.theory_skill_index >= len(skills):
                 state.advance_phase()
                 return await self.decide_next_action(state, None)

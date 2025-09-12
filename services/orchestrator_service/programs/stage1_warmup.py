@@ -1,7 +1,7 @@
 """DSPy programs for Stage-1 warm-up parsing."""
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 import dspy
 from pydantic import BaseModel, Field
@@ -137,13 +137,15 @@ class WarmupArchitectureOutput(BaseModel):
 
     architecture: Optional[str] = None
     key_technologies: List[str] = Field(default_factory=list)
+    followup_hooks: List[str] = Field(default_factory=list)
 
 
 class WarmupArchitectureProgram(dspy.Module):
     """Parse architecture information."""
 
     system_prompt: str = (
-        'Extract architecture and key_technologies (list). Respond with JSON {"architecture": string, "key_technologies": [string]}.'
+        'Extract architecture, key_technologies (list), and followup_hooks (list of technology keywords). '
+        'Respond with JSON {"architecture": string, "key_technologies": [string], "followup_hooks": [string]}.'
     )
 
     async def __call__(self, inp: WarmupArchitectureInput) -> WarmupArchitectureOutput:
@@ -193,13 +195,15 @@ class WarmupOutcomeOutput(BaseModel):
     """Extracted project outcomes."""
 
     outcomes: Optional[str] = None
+    evaluation_metrics: Dict[str, str] = Field(default_factory=dict)
 
 
 class WarmupOutcomeProgram(dspy.Module):
     """Parse project outcomes."""
 
     system_prompt: str = (
-        'Extract the project outcomes or metrics. Respond with JSON {"outcomes": string}.'
+        'Extract the project outcomes or metrics and any evaluation_metrics as key-value pairs. '
+        'Respond with JSON {"outcomes": string, "evaluation_metrics": {string: string}}.'
     )
 
     async def __call__(self, inp: WarmupOutcomeInput) -> WarmupOutcomeOutput:
