@@ -220,6 +220,19 @@ def _decrement_time(packet: ContextPacket, minutes: int) -> None:
     packet.time_remaining_min = max(remaining - minutes, 0)
 
 
+def _skill_prompt_context(packet: ContextPacket) -> str:
+    """Build a concise phrase referencing role skills and hooks."""
+
+    tags = ", ".join(packet.role_skill_tags[:5])
+    hooks = ", ".join(packet.skill_hooks[:3])
+    parts = []
+    if tags:
+        parts.append(f"technologies like {tags}")
+    if hooks:
+        parts.append(f"constraints such as {hooks}")
+    return (" involving " + " and ".join(parts)) if parts else ""
+
+
 async def analyze_jd_resume(
     jd_text: str, resume_text: str, duration_min: int = 18
 ) -> ContextPacket:
@@ -427,9 +440,10 @@ async def evidence_components(
     """Stage-2 step: ask about project components owned."""
 
     if answer is None:
+        context = _skill_prompt_context(packet)
         system_prompt = (
-            "You are an AI technical interviewer. Ask the candidate to briefly list 2–3 major components they built or owned on the selected project, "
-            "including each component's purpose and main interfaces. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
+            "You are an AI technical interviewer asking the candidate to briefly list 2–3 major components they built on the selected project, noting each component's purpose and main interfaces"
+            f"{context}. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
         )
         data = await gateway.execute_task(
             task_name="question_generation",
@@ -448,9 +462,10 @@ async def evidence_choice_space(
     """Stage-2 step: ask about considered options or approaches."""
 
     if answer is None:
+        context = _skill_prompt_context(packet)
         system_prompt = (
-            "You are an AI technical interviewer. Ask the candidate what options or approaches they considered for the chosen project. "
-            "The question must be brief and request a concise response. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
+            "You are an AI technical interviewer asking, in one short question, what options or approaches the candidate considered for the chosen project"
+            f"{context}. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
         )
         data = await gateway.execute_task(
             task_name="question_generation",
@@ -474,9 +489,10 @@ async def evidence_decision_rationale(
     """Stage-2 step: probe why a specific option was chosen."""
 
     if answer is None:
+        context = _skill_prompt_context(packet)
         system_prompt = (
-            "You are an AI technical interviewer. Ask the candidate to briefly explain why they chose a particular option from the ones considered. "
-            "Keep the question concise and expect a short answer. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
+            "You are an AI technical interviewer asking the candidate to briefly explain why they chose a particular option from the ones considered"
+            f"{context}. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
         )
         data = await gateway.execute_task(
             task_name="question_generation",
@@ -500,9 +516,10 @@ async def evidence_outcome_validation(
     """Stage-2 step: request evidence that the choice worked."""
 
     if answer is None:
+        context = _skill_prompt_context(packet)
         system_prompt = (
-            "You are an AI technical interviewer. Ask the candidate for brief evidence that their chosen option succeeded. "
-            "The question must be concise. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
+            "You are an AI technical interviewer; in a short question, ask the candidate for brief evidence that their chosen option succeeded"
+            f"{context}. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
         )
         data = await gateway.execute_task(
             task_name="question_generation",
@@ -526,9 +543,10 @@ async def evidence_tradeoff_reflection(
     """Stage-2 step: explore trade-offs or alternative paths."""
 
     if answer is None:
+        context = _skill_prompt_context(packet)
         system_prompt = (
-            "You are an AI technical interviewer. Ask the candidate to reflect on trade-offs or alternative paths they considered and why those were not chosen. "
-            "Keep it brief and expect a concise answer. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
+            "You are an AI technical interviewer asking the candidate to reflect on trade-offs or alternative paths they considered and why those were not chosen"
+            f"{context}. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
         )
         data = await gateway.execute_task(
             task_name="question_generation",
