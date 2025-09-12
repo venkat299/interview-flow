@@ -1,8 +1,12 @@
 """LLM Interviewer module for generating conversational prompts."""
 from typing import Dict, List
+import logging
 
 from gateway_service import gateway
 from .personas import PERSONA_PROMPTS
+
+
+logger = logging.getLogger(__name__)
 
 
 class LLMInterviewer:
@@ -20,15 +24,29 @@ class LLMInterviewer:
             f"{turn.get('role')}: {turn.get('message')}" for turn in history[-4:]
         )
 
+        role_skill_tags: List[str] = context.get("role_skill_tags") or []
+        skill_hooks: List[str] = context.get("skill_hooks") or []
+        recent_hooks = ", ".join(skill_hooks[-3:])
+
         system_prompt = (
             f"{persona_prompt}\n"
             "Rephrase the interview question with a natural, conversational tone."
         )
-        user_prompt = (
-            f"Original question: {stem}\n"
-            f"Conversation so far:\n{recent}\n"
-            "Return only the rephrased question."
-        )
+
+        prompt_lines = [
+            f"Original question: {stem}",
+            f"Conversation so far:\n{recent}",
+        ]
+        if role_skill_tags:
+            prompt_lines.append(
+                "Role skill tags: " + ", ".join(role_skill_tags)
+            )
+        if recent_hooks:
+            prompt_lines.append(
+                "Recent skill hooks: " + recent_hooks
+            )
+        prompt_lines.append("Return only the rephrased question.")
+        user_prompt = "\n".join(prompt_lines)
 
         try:
             data = await gateway.execute_task(
@@ -38,4 +56,5 @@ class LLMInterviewer:
             )
             return data.get("question_text", stem)
         except Exception:
+            logger.exception("Gateway question generation failed; using original stem")
             return stem
