@@ -50,6 +50,15 @@ def _is_substantive(text: str, threshold: int = 8) -> bool:
     return len(text.split()) >= threshold
 
 
+def _has_explanation(text: str, hook: str, min_follow_words: int = 3) -> bool:
+    """Return True if ``text`` includes at least ``min_follow_words`` after ``hook``."""
+    lowered = text.lower()
+    idx = lowered.find(hook.lower())
+    if idx == -1:
+        return False
+    after = lowered[idx + len(hook) :].split()
+    return len(after) >= min_follow_words
+
 def update_followup_hooks(
     packet: ContextPacket, answer: str, addressed_hook: str | None = None
 ) -> None:
@@ -62,9 +71,10 @@ def update_followup_hooks(
             packet.followup_hooks.append(hook)
         if hook not in packet.project_context.followup_hooks:
             packet.project_context.followup_hooks.append(hook)
-        if _is_substantive(answer) and hook not in packet.resolved_followup_hooks:
+        if _has_explanation(answer, hook) and hook not in packet.resolved_followup_hooks:
             packet.resolved_followup_hooks.append(hook)
 
     if addressed_hook and addressed_hook not in packet.resolved_followup_hooks:
-        if answer.strip():
+        if _is_substantive(answer):
+
             packet.resolved_followup_hooks.append(addressed_hook)

@@ -73,11 +73,18 @@ async def test_keyword_followup_injected(monkeypatch):
     assert q7["question_type"] == "targeted_followup"
     assert "kafka" in q7["question_text"].lower()
 
-    q8 = await orch.loop(state, "details about kafka on Kubernetes")
+    q8 = await orch.loop(
+        state,
+        "We streamed events using Kafka brokers and scheduled them via Kubernetes controllers",
+    )
     assert q8["question_type"] == "targeted_followup"
     assert "kubernetes" in q8["question_text"].lower()
 
-    q9 = await orch.loop(state, "k8s follow-up response with details")
+    q9 = await orch.loop(
+        state,
+        "Our Kubernetes deployment handled scaling, monitoring, and updates without downtime",
+    )
+
     assert q9["question_type"] == "warmup_constraints"
     assert state.packet.resolved_followup_hooks == ["kafka", "kubernetes"]
 
