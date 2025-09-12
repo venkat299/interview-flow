@@ -1,6 +1,7 @@
 """Core AI interview utilities."""
 
 from typing import Optional
+from types import SimpleNamespace
 
 from .schemas import (
     InterviewRequest,
@@ -212,6 +213,14 @@ _theory_question = TheoryQuestionProgram()
 _theory_eval = TheoryEvalProgram()
 _wrap_up = WrapUpProgram()
 _graph = build_interview_graph()
+
+
+async def _safe_theory_eval(answer: str):
+    """Evaluate an answer, treating malformed JSON as a failure."""
+    try:
+        return await _theory_eval(TheoryEvalInput(answer=answer))
+    except ValueError as exc:
+        return SimpleNamespace(result="fail", rationale=str(exc))
 
 
 def _decrement_time(packet: ContextPacket, minutes: int) -> None:
@@ -593,7 +602,7 @@ async def theory_primary_question(
         _decrement_time(packet, 1)
         return {"question_text": q_out.question_text, "question_type": "theory_primary"}
 
-    e_out = await _theory_eval(TheoryEvalInput(answer=answer))
+    e_out = await _safe_theory_eval(answer)
     packet.verifications.append(
         VerificationResult(skill=skill, result=e_out.result, rationale=e_out.rationale)
     )
@@ -632,7 +641,7 @@ async def theory_followup_question(
         _decrement_time(packet, 1)
         return {"question_text": data["question_text"], "question_type": "theory_followup"}
 
-    e_out = await _theory_eval(TheoryEvalInput(answer=answer))
+    e_out = await _safe_theory_eval(answer)
     if packet.verifications:
         packet.verifications[-1].followup_result = e_out.result
         packet.verifications[-1].followup_rationale = e_out.rationale

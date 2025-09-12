@@ -20,7 +20,7 @@ from .llm_api import (
     wrapup_candidate_questions,
     wrapup_feedback,
 )
-from .followups import build_followup_question
+from .followups import build_followup_question, update_followup_hooks
 from session_service.question_log_db import log_question_response
 
 
@@ -43,6 +43,9 @@ class Orchestrator:
                 session_id=getattr(state, "session_id", None),
                 candidate_id=getattr(state, "candidate_id", None),
             )
+
+            update_followup_hooks(packet, answer)
+
             return await self.decide_next_action(state, None)
 
         # Insert targeted follow-up questions when hooks are present

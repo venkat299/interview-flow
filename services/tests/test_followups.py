@@ -7,7 +7,10 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from orchestrator_service import llm_api as ai
 from orchestrator_service.orchestrator import Orchestrator
-from session_service.interview_state import InterviewState
+from session_service.interview_state import InterviewState\
+
+from orchestrator_service.schemas import ContextPacket
+
 
 
 @pytest.mark.asyncio
@@ -60,5 +63,30 @@ async def test_keyword_followup_injected(monkeypatch):
     assert q4["question_type"] == "targeted_followup"
     assert "Kafka" in q4["question_text"]
 
-    q5 = await orch.loop(state, "details about kafka")
-    assert q5["question_type"] == "warmup_constraints"
+    q5 = await orch.loop(state, "details about kafka on Kubernetes")
+    assert q5["question_type"] == "targeted_followup"
+    assert "Kubernetes" in q5["question_text"]
+
+    q6 = await orch.loop(state, "k8s follow-up response")
+    assert q6["question_type"] == "warmup_constraints"
+
+
+@pytest.mark.asyncio
+async def test_theory_eval_handles_bad_json(monkeypatch):
+    async def fake_eval(inp):
+        raise ValueError("bad json")
+
+    monkeypatch.setattr(ai, "_theory_eval", fake_eval)
+
+    packet = ContextPacket(jd_text="JD", resume_text="Resume")
+
+    await ai.theory_primary_question(packet, "kafka", answer="ans")
+    ver = packet.verifications[-1]
+    assert ver.result == "fail"
+    assert "bad json" in ver.rationale
+
+    await ai.theory_followup_question(packet, "kafka", answer="ans2")
+    ver = packet.verifications[-1]
+    assert ver.followup_result == "fail"
+    assert "bad json" in ver.followup_rationale
+
