@@ -106,12 +106,12 @@ async def test_run_interview_end_to_end(monkeypatch):
     assert q14["question_type"] == "theory_followup"
 
     q15 = await orch.loop(state, "deeper answer")
-    assert q15["question_type"] == "wrapup_candidate_questions"
+    assert q15["question_type"] == "wrapup_feedback"
 
-    q16 = await orch.loop(state, "No questions")
-    assert q16["question_type"] == "wrapup_feedback"
+    q16 = await orch.loop(state, "All good")
+    assert q16["question_type"] == "wrapup_closing"
 
-    q17 = await orch.loop(state, "All good")
+    q17 = await orch.loop(state)
     assert q17 is None
     assert state.packet.time_remaining_min == 0
 

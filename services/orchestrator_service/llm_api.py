@@ -648,27 +648,6 @@ async def theory_followup_question(
     return None
 
 
-async def wrapup_candidate_questions(
-    packet: ContextPacket, answer: Optional[str] = None
-) -> Optional[dict]:
-    """Stage-4 step: invite candidate questions about the role or team."""
-
-    if answer is None:
-        notes = "; ".join(packet.notes)
-        system_prompt = (
-            "You are an AI technical interviewer wrapping up the conversation. Based on these notes from the interview, ask the candidate in one short sentence if they have any questions about the role, team, or company. "
-            f"Notes: {notes}. Respond ONLY with a single, valid JSON object with a single key 'question_text'."
-        )
-        data = await gateway.execute_task(
-            task_name="question_generation",
-            system_prompt=system_prompt,
-        )
-        _decrement_time(packet, 1)
-        return {"question_text": data["question_text"], "question_type": "wrapup_candidate_questions"}
-
-    packet.notes.append(f"Candidate questions: {answer}")
-    return None
-
 
 async def wrapup_feedback(
     packet: ContextPacket, answer: Optional[str] = None
@@ -697,6 +676,23 @@ async def wrapup_feedback(
         packet.notes.append("Follow-ups: " + ", ".join(out.follow_ups))
     packet.time_remaining_min = 0
     return None
+
+
+async def wrapup_closing(packet: ContextPacket) -> dict:
+    """Stage-4 step: deliver a brief thank-you closing message."""
+
+    notes = "; ".join(packet.notes)
+    system_prompt = (
+        "You are an AI technical interviewer concluding the interview. "
+        "Craft a short thank-you message summarizing the session using these notes. "
+        "Respond ONLY with a single, valid JSON object with a single key 'question_text'."
+        f" Notes: {notes}."
+    )
+    data = await gateway.execute_task(
+        task_name="question_generation",
+        system_prompt=system_prompt,
+    )
+    return {"question_text": data["question_text"], "question_type": "wrapup_closing"}
 
 
 async def run_interview(packet: ContextPacket) -> ContextPacket:
