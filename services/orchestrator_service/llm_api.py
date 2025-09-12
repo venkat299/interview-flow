@@ -1,6 +1,7 @@
 """Core AI interview utilities."""
 
 from typing import Optional
+from types import SimpleNamespace
 
 from .schemas import (
     InterviewRequest,
@@ -46,6 +47,7 @@ from .programs.stage4_wrapup import (
     WrapUpInput,
 )
 from .flow import build_interview_graph
+from .followups import update_followup_hooks
 
 
 
@@ -213,6 +215,14 @@ _wrap_up = WrapUpProgram()
 _graph = build_interview_graph()
 
 
+async def _safe_theory_eval(answer: str):
+    """Evaluate an answer, treating malformed JSON as a failure."""
+    try:
+        return await _theory_eval(TheoryEvalInput(answer=answer))
+    except ValueError as exc:
+        return SimpleNamespace(result="fail", rationale=str(exc))
+
+
 def _decrement_time(packet: ContextPacket, minutes: int) -> None:
     """Reduce available interview time on the context packet."""
 
@@ -300,6 +310,7 @@ async def warmup_select_project(
         user_prompt=answer,
     )
     packet.selected_project = data.get("project_name")
+    update_followup_hooks(packet, answer)
     return None
 
 
@@ -323,6 +334,7 @@ async def warmup_role_context(
     data = await WarmupRoleProgram()(WarmupRoleInput(answer=answer))
     packet.project_context.role = data.role
     packet.project_context.team_size = data.team_size
+    update_followup_hooks(packet, answer)
     return None
 
 
@@ -348,6 +360,7 @@ async def warmup_architecture(
     packet.project_context.key_technologies = data.key_technologies
     packet.project_context.followup_hooks = data.followup_hooks
     packet.followup_hooks.extend(h for h in data.followup_hooks if h not in packet.followup_hooks)
+    update_followup_hooks(packet, answer)
     return None
 
 
@@ -370,6 +383,7 @@ async def warmup_constraints(
 
     data = await WarmupConstraintsProgram()(WarmupConstraintsInput(answer=answer))
     packet.project_context.constraints = data.constraints
+    update_followup_hooks(packet, answer)
     return None
 
 
@@ -392,6 +406,7 @@ async def warmup_challenge(
 
     data = await WarmupChallengeProgram()(WarmupChallengeInput(answer=answer))
     packet.project_context.hardest_challenge = data.hardest_challenge
+    update_followup_hooks(packet, answer)
     return None
 
 
@@ -415,6 +430,7 @@ async def warmup_outcome(
     data = await WarmupOutcomeProgram()(WarmupOutcomeInput(answer=answer))
     packet.project_context.outcomes = data.outcomes
     packet.project_context.evaluation_metrics = data.evaluation_metrics
+    update_followup_hooks(packet, answer)
     return None
 
 
@@ -437,6 +453,7 @@ async def warmup_reflection(
 
     data = await WarmupReflectionProgram()(WarmupReflectionInput(answer=answer))
     packet.project_context.lessons = data.lessons
+    update_followup_hooks(packet, answer)
     return None
 
 
@@ -459,6 +476,7 @@ async def evidence_components(
         return {"question_text": data["question_text"], "question_type": "evidence_components"}
 
     packet.notes.append(f"Components: {answer}")
+    update_followup_hooks(packet, answer)
     return None
 
 
@@ -486,6 +504,7 @@ async def evidence_choice_space(
         user_prompt=answer,
     )
     packet.notes.extend([f"Choice space: {n}" for n in data.get("notes", [])])
+    update_followup_hooks(packet, answer)
     return None
 
 
@@ -513,6 +532,7 @@ async def evidence_decision_rationale(
         user_prompt=answer,
     )
     packet.notes.extend([f"Rationale: {n}" for n in data.get("notes", [])])
+    update_followup_hooks(packet, answer)
     return None
 
 
@@ -540,6 +560,7 @@ async def evidence_outcome_validation(
         user_prompt=answer,
     )
     packet.notes.extend([f"Outcome: {n}" for n in data.get("notes", [])])
+    update_followup_hooks(packet, answer)
     return None
 
 
@@ -567,6 +588,7 @@ async def evidence_tradeoff_reflection(
         user_prompt=answer,
     )
     packet.notes.extend([f"Trade-offs: {n}" for n in data.get("notes", [])])
+    update_followup_hooks(packet, answer)
     return None
 
 
@@ -580,7 +602,7 @@ async def theory_primary_question(
         _decrement_time(packet, 1)
         return {"question_text": q_out.question_text, "question_type": "theory_primary"}
 
-    e_out = await _theory_eval(TheoryEvalInput(answer=answer))
+    e_out = await _safe_theory_eval(answer)
     packet.verifications.append(
         VerificationResult(skill=skill, result=e_out.result, rationale=e_out.rationale)
     )
@@ -619,7 +641,7 @@ async def theory_followup_question(
         _decrement_time(packet, 1)
         return {"question_text": data["question_text"], "question_type": "theory_followup"}
 
-    e_out = await _theory_eval(TheoryEvalInput(answer=answer))
+    e_out = await _safe_theory_eval(answer)
     if packet.verifications:
         packet.verifications[-1].followup_result = e_out.result
         packet.verifications[-1].followup_rationale = e_out.rationale
