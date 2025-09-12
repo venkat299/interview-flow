@@ -11,10 +11,14 @@ class InterviewState:
     phases: List[str] = ["warm_up", "evidence", "theory", "wrap_up"]
     warmup_steps: List[str] = [
         "select_project",
-        "role_context",
+        "project_overview",
+        "role",
+        "team_size",
         "architecture",
+        "tech_stack",
         "constraints",
         "challenge",
+        "resolution",
         "outcome",
         "reflection",
     ]

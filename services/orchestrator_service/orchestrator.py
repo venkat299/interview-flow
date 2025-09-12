@@ -4,10 +4,14 @@ from typing import Any, Optional
 
 from .llm_api import (
     warmup_select_project,
-    warmup_role_context,
+    warmup_project_overview,
+    warmup_role,
+    warmup_team_size,
     warmup_architecture,
+    warmup_tech_stack,
     warmup_constraints,
     warmup_challenge,
+    warmup_resolution,
     warmup_outcome,
     warmup_reflection,
     evidence_components,
@@ -76,10 +80,14 @@ class Orchestrator:
             step = state.current_warmup_step
             func_map = {
                 "select_project": warmup_select_project,
-                "role_context": warmup_role_context,
+                "project_overview": warmup_project_overview,
+                "role": warmup_role,
+                "team_size": warmup_team_size,
                 "architecture": warmup_architecture,
+                "tech_stack": warmup_tech_stack,
                 "constraints": warmup_constraints,
                 "challenge": warmup_challenge,
+                "resolution": warmup_resolution,
                 "outcome": warmup_outcome,
                 "reflection": warmup_reflection,
             }
