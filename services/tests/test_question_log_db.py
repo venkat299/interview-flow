@@ -6,10 +6,10 @@ def test_log_question_response_captures_question_and_answer(tmp_path):
     db_path = tmp_path / "question_logs.db"
     init_db(db_path)
     log_question_response(
-        stage="evidence",
-        question_type="choice_space",
-        question_text="What options did you consider?",
-        answer_text="Option A and B",
+        stage="theory",
+        question_type="primary",
+        question_text="What is Python?",
+        answer_text="A language",
         session_id="s1",
         candidate_id="c1",
         db_path=db_path,
@@ -22,8 +22,8 @@ def test_log_question_response_captures_question_and_answer(tmp_path):
     row = cur.fetchone()
     conn.close()
     assert row == (
-        "evidence",
-        "choice_space",
-        "What options did you consider?",
-        "Option A and B",
+        "theory",
+        "primary",
+        "What is Python?",
+        "A language",
     )

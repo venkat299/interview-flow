@@ -4,10 +4,8 @@ This document describes the end-to-end flow of the AI interview application, det
 
 ## Stage Overview
 - **Stage 0** – analyze the job description and resume to initialize context and timers.
-- **Stage 1** – warm-up prompts gather project background and constraints.
-- **Stage 2** – evidence questions collect skill hooks and confidence ratings.
-- **Stage 3** – verification turns check fundamentals for each hook.
-- **Stage 4** – wrap-up summarizes strengths, risks, and follow-ups.
+- **Stage 1** – theory prompts check fundamentals for each required skill.
+- **Stage 2** – wrap-up summarizes strengths, risks, and follow-ups.
 
 ## 1. Service Startup
 1. **FastAPI application** (`services/api_service/app/main.py`)

@@ -8,27 +8,7 @@ from orchestrator_service.schemas import ContextPacket
 class InterviewState:
     """Tracks the shared context packet and phase progression."""
 
-    phases: List[str] = ["experience", "theory", "wrap_up"]
-    default_experience_steps: List[str] = [
-        "select_project",
-        "project_overview",
-        "role",
-        "team_size",
-        "architecture",
-        "tech_stack",
-        "constraints",
-        "challenge",
-        "resolution",
-        "outcome",
-        "reflection",
-        "components_list",
-        "component_details",
-        "choice_space",
-        "decision_rationale",
-        "outcome_validation",
-        "tradeoff_exploration",
-        "tradeoff_reasoning",
-    ]
+    phases: List[str] = ["theory", "wrap_up"]
     theory_steps: List[str] = [
         "primary",
         "followup",
@@ -46,12 +26,6 @@ class InterviewState:
     ) -> None:
         self.packet = packet
         self.phase_index = 0
-        # Stage-based step indexes
-        plan = list(packet.experience_plan or [])
-        if not plan:
-            plan = list(self.default_experience_steps)
-        self.experience_plan: List[str] = plan
-        self.experience_index = 0
         self.theory_index = 0
         self.theory_skill_index = 0
         self.wrapup_index = 0
@@ -74,19 +48,6 @@ class InterviewState:
         """Move to the next interview phase if available."""
         if self.phase_index < len(self.phases) - 1:
             self.phase_index += 1
-
-    @property
-    def current_experience_step(self) -> Optional[str]:
-        if self.experience_index >= len(self.experience_plan):
-            return None
-        return self.experience_plan[self.experience_index]
-
-    def advance_experience_step(self) -> None:
-        if self.experience_index < len(self.experience_plan) - 1:
-            self.experience_index += 1
-        else:
-            self.experience_index += 1
-            self.advance_phase()
 
     @property
     def current_theory_step(self) -> str:

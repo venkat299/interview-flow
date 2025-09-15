@@ -5,13 +5,6 @@ from langgraph.graph import StateGraph, START, END
 
 from .schemas import ContextPacket, VerificationResult
 from .programs.stage0_analysis import Stage0AnalysisProgram, JDResumeAnalysisInput
-from .programs.stage1_warmup import (
-    WarmupOverviewProgram,
-    WarmupOverviewInput,
-    WarmupConstraintProgram,
-    WarmupConstraintInput,
-)
-from .programs.stage2_evidence import EvidenceProgram, EvidenceInput
 from .programs.stage3_theory import (
     TheoryQuestionProgram,
     TheoryQuestionInput,
@@ -33,34 +26,9 @@ async def stage0_analysis_node(state: InterviewState) -> dict:
     return output.model_dump()
 
 
-async def stage1_warmup_node(state: InterviewState) -> dict:
-    """Parse warm-up responses into project context."""
-    overview = await WarmupOverviewProgram()(WarmupOverviewInput(answer=state.selected_project or ""))
-    constraint = await WarmupConstraintProgram()(WarmupConstraintInput(answer=state.project_context.scale_latency_slo or ""))
-    ctx = state.project_context.model_copy()
-    ctx.goal = overview.goal
-    ctx.constraints = overview.constraints
-    ctx.scale_latency_slo = constraint.scale_latency_slo
-    return {"project_context": ctx.model_dump()}
-
-
-async def stage2_evidence_node(state: InterviewState) -> dict:
-    """Extract evidence details from candidate answer."""
-    answer = state.notes[-1] if state.notes else ""
-    output = await EvidenceProgram()(EvidenceInput(answer=answer))
-    ctx = state.project_context.model_copy()
-    ctx.evaluation_metrics.update(output.evaluation_metrics)
-    return {
-        "skill_hooks": output.skill_hooks,
-        "followup_hooks": state.followup_hooks + output.followup_hooks,
-        "notes": state.notes + output.notes,
-        "project_context": ctx.model_dump(),
-    }
-
-
 async def stage3_theory_node(state: InterviewState) -> dict:
     """Run a theory check on each collected skill in sequence."""
-    skills = state.followup_hooks or state.skill_hooks
+    skills = state.followup_hooks or state.skill_hooks or state.jd_core_skills
     if not skills:
         return {}
 
@@ -90,15 +58,11 @@ def build_interview_graph() -> StateGraph:
     """Create a sequential LangGraph covering all interview stages."""
     graph = StateGraph(InterviewState)
     graph.add_node("stage0_analysis", stage0_analysis_node)
-    graph.add_node("stage1_warmup", stage1_warmup_node)
-    graph.add_node("stage2_evidence", stage2_evidence_node)
     graph.add_node("stage3_theory", stage3_theory_node)
     graph.add_node("stage4_wrapup", stage4_wrapup_node)
 
     graph.add_edge(START, "stage0_analysis")
-    graph.add_edge("stage0_analysis", "stage1_warmup")
-    graph.add_edge("stage1_warmup", "stage2_evidence")
-    graph.add_edge("stage2_evidence", "stage3_theory")
+    graph.add_edge("stage0_analysis", "stage3_theory")
 
     def _more_theory(state: InterviewState) -> str:
         skills = state.followup_hooks or state.skill_hooks or state.jd_core_skills

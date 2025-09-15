@@ -150,13 +150,3 @@ async def test_generate_soft_skill_question(monkeypatch):
     assert question == "Describe a time you worked on a team."
 
 
-@pytest.mark.asyncio
-async def test_warmup_select_project_skips_when_prefilled(monkeypatch):
-    async def fail_execute(*args, **kwargs):  # pragma: no cover - should not run
-        raise AssertionError("gateway should not be called when project preselected")
-
-    monkeypatch.setattr(ai.gateway, "execute_task", fail_execute)
-
-    packet = ContextPacket(jd_text="jd", resume_text="resume", selected_project="Demo App")
-    result = await ai.warmup_select_project(packet)
-    assert result is None

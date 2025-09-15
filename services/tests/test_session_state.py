@@ -38,9 +38,8 @@ def test_stage_progression_and_time():
     packet = ContextPacket(jd_text="", resume_text="", duration_min=10)
     packet.time_remaining_min = 10
     state = InterviewState(packet)
-    assert state.current_phase == "experience"
-    assert state.current_experience_step == state.default_experience_steps[0]
-    state.advance_phase()
     assert state.current_phase == "theory"
+    state.advance_phase()
+    assert state.current_phase == "wrap_up"
     state.decrement_time(3)
     assert state.packet.time_remaining_min == 7

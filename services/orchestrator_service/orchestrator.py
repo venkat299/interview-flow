@@ -3,24 +3,6 @@
 from typing import Any, Optional
 
 from .llm_api import (
-    warmup_select_project,
-    warmup_project_overview,
-    warmup_role,
-    warmup_team_size,
-    warmup_architecture,
-    warmup_tech_stack,
-    warmup_constraints,
-    warmup_challenge,
-    warmup_resolution,
-    warmup_outcome,
-    warmup_reflection,
-    evidence_components_list,
-    evidence_component_details,
-    evidence_choice_space,
-    evidence_decision_rationale,
-    evidence_outcome_validation,
-    evidence_tradeoff_exploration,
-    evidence_tradeoff_reasoning,
     theory_primary_question,
     theory_followup_question,
     wrapup_feedback,
@@ -71,53 +53,6 @@ class Orchestrator:
                     state.last_question_type = "targeted_followup"
                     state.last_followup_hook = hook
                     return {"question_text": q_text, "question_type": "targeted_followup"}
-
-        if phase == "experience":
-            if answer is not None and getattr(state, "last_question_text", None):
-                log_question_response(
-                    stage=phase,
-                    question_type=getattr(state, "last_question_type", ""),
-                    question_text=getattr(state, "last_question_text", ""),
-                    answer_text=answer,
-                    session_id=getattr(state, "session_id", None),
-                    candidate_id=getattr(state, "candidate_id", None),
-                )
-            step = state.current_experience_step
-            if step is None:
-                state.advance_phase()
-                return await self.decide_next_action(state, None)
-            func_map = {
-                "select_project": warmup_select_project,
-                "project_overview": warmup_project_overview,
-                "role": warmup_role,
-                "team_size": warmup_team_size,
-                "architecture": warmup_architecture,
-                "tech_stack": warmup_tech_stack,
-                "constraints": warmup_constraints,
-                "challenge": warmup_challenge,
-                "resolution": warmup_resolution,
-                "outcome": warmup_outcome,
-                "reflection": warmup_reflection,
-                "components_list": evidence_components_list,
-                "component_details": evidence_component_details,
-                "choice_space": evidence_choice_space,
-                "decision_rationale": evidence_decision_rationale,
-                "outcome_validation": evidence_outcome_validation,
-                "tradeoff_exploration": evidence_tradeoff_exploration,
-                "tradeoff_reasoning": evidence_tradeoff_reasoning,
-            }
-            handler = func_map.get(step)
-            if handler is None:
-                state.advance_experience_step()
-                return await self.decide_next_action(state, None)
-            q = await handler(packet, answer)
-            if q is None:
-                state.advance_experience_step()
-                return await self.decide_next_action(state, None)
-            state.last_question_text = q.get("question_text")
-            state.last_question_type = q.get("question_type")
-            return q
-
 
         if phase == "theory":
             if answer is not None and getattr(state, "last_question_text", None):

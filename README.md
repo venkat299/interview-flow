@@ -61,13 +61,11 @@ and calls orchestration functions in‑process for lower latency.
 
 ### Interview Stages
 
-The orchestrator advances the conversation through five stages:
+The orchestrator advances the conversation through three stages:
 
 1. **Stage 0** – analyze the job description and resume to seed context and timers.
-2. **Stage 1** – warm‑up questions gather project background and constraints.
-3. **Stage 2** – evidence questions capture skill hooks and confidence ratings.
-4. **Stage 3** – verification prompts check fundamentals for each hook.
-5. **Stage 4** – wrap‑up summarizes strengths, risks, and follow-ups.
+2. **Stage 1** – theory prompts check fundamentals for each required skill.
+3. **Stage 2** – wrap‑up summarizes strengths, risks, and follow-ups.
 
 See `application-flow.md` for a detailed walkthrough of these stages and service interactions.
 
