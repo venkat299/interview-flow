@@ -20,6 +20,9 @@
             </div>
             <div class="mb-3">
                 <textarea id="resume" class="form-control" placeholder="Paste your resume here"></textarea>
+                <div class="text-end mt-2">
+                    <button id="generate-resume" type="button" class="btn btn-sm btn-outline-primary">Generate Test Resume</button>
+                </div>
             </div>
             <div class="mb-3">
                 <label for="time-limit" class="form-label">Interview Duration</label>
@@ -192,6 +195,7 @@
     const refreshResumesBtn = document.getElementById('refresh-resumes');
     const addPostingBtn = document.getElementById('add-posting');
     const addResumeBtn = document.getElementById('add-resume');
+    const generateResumeBtn = document.getElementById('generate-resume');
     const testToggle = document.getElementById('test-mode-toggle');
     const jobModalEl = document.getElementById('job-posting-modal');
     const resumeModalEl = document.getElementById('resume-modal');
@@ -210,6 +214,7 @@
     if (testToggle) {
         testToggle.addEventListener('change', () => {
             testingMode = testToggle.checked;
+            updateGenerateResumeState();
         });
     }
 
@@ -245,9 +250,19 @@
         startBtn.disabled = !(hasJD && hasResume);
     }
 
+    function updateGenerateResumeState() {
+        if (!generateResumeBtn) return;
+        const hasJob = Number.isFinite(selectedJobId);
+        generateResumeBtn.disabled = !(testingMode && hasJob);
+    }
+
     async function applyJobSelection(id) {
         jobDescEl.value = '';
         resumeEl.value = '';
+        sessionStorage.removeItem('candidate_id');
+        sessionStorage.removeItem('candidate_profile');
+        sessionStorage.removeItem('candidate_resume');
+        sessionStorage.removeItem('candidate_display_name');
         updateStartButtonState();
 
         const numericId = Number(id);
@@ -255,12 +270,14 @@
             selectedJobId = null;
             sessionStorage.removeItem('job_id');
             renderJobPostings(jobPostingsCache);
+            updateGenerateResumeState();
             return;
         }
 
         selectedJobId = numericId;
         sessionStorage.setItem('job_id', String(numericId));
         renderJobPostings(jobPostingsCache);
+        updateGenerateResumeState();
 
         try {
             const resp = await fetch(`${AI_SERVICE_URL}/job-postings/${numericId}`);
@@ -277,15 +294,6 @@
                 parts.push(`Required Qualifications:\n${bullets}`);
             }
             jobDescEl.value = parts.join('\n\n');
-            if (testingMode) {
-                const gen = await fetch(`${AI_SERVICE_URL}/app-test/generate-candidate/${numericId}`, { method: 'POST' });
-                if (gen.ok) {
-                    const cand = await gen.json();
-                    if (cand.candidate_id) sessionStorage.setItem('candidate_id', cand.candidate_id);
-                    if (cand.profile) sessionStorage.setItem('candidate_profile', JSON.stringify(cand.profile));
-                    resumeEl.value = cand.resume || '';
-                }
-            }
             updateStartButtonState();
         } catch (e) {
             console.error('Failed to load job', e);
@@ -325,6 +333,7 @@
             jobPostingsCache = Array.isArray(data.items) ? data.items : [];
             renderJobPostings(jobPostingsCache);
             populateResumeJobOptions();
+            updateGenerateResumeState();
         } catch (e) {
             console.error('Failed to load job postings', e);
         }
@@ -439,6 +448,7 @@
                     sessionStorage.removeItem('job_id');
                     jobDescEl.value = '';
                     updateStartButtonState();
+                    updateGenerateResumeState();
                 }
                 await loadJobPostings();
             } catch (e) {
@@ -621,12 +631,56 @@
     if (refreshSessionsBtn) refreshSessionsBtn.addEventListener('click', loadSessions);
     if (refreshPostingsBtn) refreshPostingsBtn.addEventListener('click', async () => { await loadJobPostings(); });
     if (refreshResumesBtn) refreshResumesBtn.addEventListener('click', async () => { await loadResumes(); });
+    if (generateResumeBtn) {
+        generateResumeBtn.addEventListener('click', async () => {
+            if (!testingMode) {
+                alert('Enable Testing Mode to generate a resume automatically.');
+                return;
+            }
+            if (!Number.isFinite(selectedJobId)) {
+                alert('Select a job posting first.');
+                return;
+            }
+            try {
+                generateResumeBtn.disabled = true;
+                const resp = await fetch(`${AI_SERVICE_URL}/app-test/generate-candidate/${selectedJobId}`, { method: 'POST' });
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({}));
+                    throw new Error(err.detail || 'Failed to generate resume');
+                }
+                const cand = await resp.json();
+                const candidateId = cand.candidate_id || '';
+                sessionStorage.setItem('candidate_id', candidateId);
+                if (cand.profile) {
+                    const profileStr = typeof cand.profile === 'string' ? cand.profile : JSON.stringify(cand.profile);
+                    sessionStorage.setItem('candidate_profile', profileStr);
+                } else {
+                    sessionStorage.removeItem('candidate_profile');
+                }
+                const resumeText = cand.resume || '';
+                resumeEl.value = resumeText;
+                sessionStorage.setItem('candidate_resume', resumeText);
+                if (cand.display_name) {
+                    sessionStorage.setItem('candidate_display_name', cand.display_name);
+                } else {
+                    sessionStorage.removeItem('candidate_display_name');
+                }
+                updateStartButtonState();
+            } catch (e) {
+                console.error('Failed to generate resume', e);
+                alert(`Could not generate resume: ${e.message || e}`);
+            } finally {
+                updateGenerateResumeState();
+            }
+        });
+    }
 
     jobDescEl.value = '';
     resumeEl.value = '';
     updateStartButtonState();
     try { testToggle.checked = true; } catch (_) {}
     testingMode = true;
+    updateGenerateResumeState();
     loadJobPostings();
     loadResumes();
     loadSessions();
