@@ -14,7 +14,7 @@
 providers:
   # Local OpenAI-compatible server (e.g., LM Studio, Ollama, vLLM, OpenAI-compatible proxy)
   local:
-    base_url: https://22d7c85b0dd7.ngrok-free.app/v1/chat/completions
+    base_url: https://6311e26c90cd.ngrok-free.app/v1/chat/completions
     api_key: ""
     model: openai/gpt-oss-20b
     # Optional generation controls (disabled by request)
