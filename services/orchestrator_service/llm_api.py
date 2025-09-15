@@ -283,7 +283,9 @@ async def analyze_jd_resume(
         resume_claims=out.resume_claims,
         overlap_skills=out.overlap_skills,
         primary_overlap_focus=out.primary_overlap_focus,
+        selected_project=out.selected_project,
         role_skill_tags=merged_tags,
+        experience_plan=list(out.experience_plan or []),
     )
     packet.time_remaining_min = packet.duration_min
     return packet

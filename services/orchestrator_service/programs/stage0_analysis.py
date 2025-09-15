@@ -24,6 +24,8 @@ class JDResumeAnalysisOutput(BaseModel):
     resume_claims: List[str] = Field(default_factory=list)
     overlap_skills: List[str] = Field(default_factory=list)
     primary_overlap_focus: Optional[str] = None
+    selected_project: Optional[str] = None
+    experience_plan: List[str] = Field(default_factory=list)
 
 
 class Stage0AnalysisProgram(dspy.Module):
@@ -32,7 +34,8 @@ class Stage0AnalysisProgram(dspy.Module):
     system_prompt: str = (
         "Read the job description and resume. Return JSON with the following keys: "
         "role_from_jd, jd_core_skills (list), resume_claims (list), "
-        "overlap_skills (list), primary_overlap_focus."
+        "overlap_skills (list), primary_overlap_focus, selected_project (string), "
+        "experience_plan (ordered list of warm-up/evidence slot identifiers)."
     )
 
     async def __call__(self, inp: JDResumeAnalysisInput) -> JDResumeAnalysisOutput:

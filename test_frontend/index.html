@@ -35,7 +35,10 @@
         <div class="card p-4 mx-auto mt-4" style="max-width: 900px;">
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <h5 class="mb-0">Job Postings</h5>
-                <button id="refresh-postings" class="btn btn-sm btn-outline-secondary">Refresh</button>
+                <div class="btn-group btn-group-sm" role="group">
+                    <button id="add-posting" type="button" class="btn btn-outline-success">Add</button>
+                    <button id="refresh-postings" type="button" class="btn btn-outline-secondary">Refresh</button>
+                </div>
             </div>
             <div class="table-responsive">
                 <table class="table table-sm align-middle" id="job-postings-table">
@@ -43,11 +46,35 @@
                         <tr>
                             <th style="width: 80px;">ID</th>
                             <th>Title</th>
-                            <th style="width: 140px;">Action</th>
+                            <th style="width: 170px;" class="text-end">Action</th>
                         </tr>
                     </thead>
                     <tbody id="job-postings-tbody">
                         <tr><td colspan="3" class="text-muted">No job postings loaded</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card p-4 mx-auto mt-4" style="max-width: 900px;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="mb-0">Resumes</h5>
+                <div class="btn-group btn-group-sm" role="group">
+                    <button id="add-resume" type="button" class="btn btn-outline-success">Add</button>
+                    <button id="refresh-resumes" type="button" class="btn btn-outline-secondary">Refresh</button>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle" id="saved-resumes-table">
+                    <thead>
+                        <tr>
+                            <th>Resume</th>
+                            <th style="width: 160px;">Job</th>
+                            <th style="width: 170px;" class="text-end">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="saved-resumes-tbody">
+                        <tr><td colspan="3" class="text-muted">No resumes loaded</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -61,25 +88,156 @@
             <div id="sessions-container" class="list-group small"></div>
         </div>
     </div>
+
+    <!-- Job posting modal -->
+    <div class="modal fade" id="job-posting-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Job Posting</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="job-posting-form">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label" for="job-title-input">Job title</label>
+                            <input type="text" class="form-control" id="job-title-input" name="job_title" required>
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-md-6">
+                                <label class="form-label" for="job-company-input">Company</label>
+                                <input type="text" class="form-control" id="job-company-input" name="company" placeholder="Optional">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="job-location-input">Location</label>
+                                <input type="text" class="form-control" id="job-location-input" name="location" placeholder="Optional">
+                            </div>
+                        </div>
+                        <div class="row g-2 mt-2">
+                            <div class="col-md-6">
+                                <label class="form-label" for="job-experience-input">Experience level</label>
+                                <input type="text" class="form-control" id="job-experience-input" name="experience_level" placeholder="Optional">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="job-category-input">Category</label>
+                                <input type="text" class="form-control" id="job-category-input" name="category" placeholder="Optional">
+                            </div>
+                        </div>
+                        <div class="mb-3 mt-3">
+                            <label class="form-label" for="job-description-input">Description</label>
+                            <textarea class="form-control" id="job-description-input" name="description" rows="3" required></textarea>
+                            <div class="form-text">Paste the job description or summary.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="job-responsibilities-input">Responsibilities (one per line)</label>
+                            <textarea class="form-control" id="job-responsibilities-input" name="responsibilities" rows="2"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="job-qualifications-input">Required qualifications (one per line)</label>
+                            <textarea class="form-control" id="job-qualifications-input" name="required_qualifications" rows="2"></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save job</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resume modal -->
+    <div class="modal fade" id="resume-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Save Resume</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="resume-form">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label" for="resume-display-name">Resume label</label>
+                            <input type="text" class="form-control" id="resume-display-name" name="display_name" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="resume-job-id">Linked job posting</label>
+                            <select class="form-select" id="resume-job-id" name="job_id" required></select>
+                            <div class="form-text">Resumes are stored against a job posting for analytics.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="resume-text-input">Resume text</label>
+                            <textarea class="form-control" id="resume-text-input" name="resume" rows="6" required></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save resume</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script>
 
     const AI_SERVICE_URL = 'http://localhost:8003';
     // Share with chat page
     try { sessionStorage.setItem('AI_SERVICE_URL', AI_SERVICE_URL); } catch (e) {}
     const postingsTbody = document.getElementById('job-postings-tbody');
+    const resumesTbody = document.getElementById('saved-resumes-tbody');
     const sessionsContainer = document.getElementById('sessions-container');
-    const refreshBtn = document.getElementById('refresh-sessions');
+    const refreshSessionsBtn = document.getElementById('refresh-sessions');
     const refreshPostingsBtn = document.getElementById('refresh-postings');
+    const refreshResumesBtn = document.getElementById('refresh-resumes');
+    const addPostingBtn = document.getElementById('add-posting');
+    const addResumeBtn = document.getElementById('add-resume');
     const testToggle = document.getElementById('test-mode-toggle');
-    let testingMode = false;
+    const jobModalEl = document.getElementById('job-posting-modal');
+    const resumeModalEl = document.getElementById('resume-modal');
+    const jobForm = document.getElementById('job-posting-form');
+    const resumeForm = document.getElementById('resume-form');
+    const resumeJobSelect = document.getElementById('resume-job-id');
 
-    testToggle.addEventListener('change', () => {
-        testingMode = testToggle.checked;
-    });
+    let testingMode = false;
+    let selectedJobId = null;
+    let jobPostingsCache = [];
 
     const jobDescEl = document.getElementById('job-description');
     const resumeEl = document.getElementById('resume');
     const startBtn = document.getElementById('start-button');
+
+    if (testToggle) {
+        testToggle.addEventListener('change', () => {
+            testingMode = testToggle.checked;
+        });
+    }
+
+    function escapeHtml(value) {
+        const safeValue = value == null ? '' : value;
+        return String(safeValue)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function splitLines(value) {
+        if (!value) return [];
+        return String(value)
+            .split(/\r?\n/)
+            .map(part => part.trim())
+            .filter(Boolean);
+    }
+
+    function getModal(el) {
+        if (!el || !window.bootstrap) {
+            console.warn('Bootstrap modal requested but not available yet');
+            return null;
+        }
+        return window.bootstrap.Modal.getOrCreateInstance(el);
+    }
 
     function updateStartButtonState() {
         const hasJD = !!(jobDescEl.value && jobDescEl.value.trim());
@@ -91,9 +249,22 @@
         jobDescEl.value = '';
         resumeEl.value = '';
         updateStartButtonState();
-        if (!id) return;
+
+        const numericId = Number(id);
+        if (!Number.isFinite(numericId)) {
+            selectedJobId = null;
+            sessionStorage.removeItem('job_id');
+            renderJobPostings(jobPostingsCache);
+            return;
+        }
+
+        selectedJobId = numericId;
+        sessionStorage.setItem('job_id', String(numericId));
+        renderJobPostings(jobPostingsCache);
+
         try {
-            const resp = await fetch(`${AI_SERVICE_URL}/job-postings/${id}`);
+            const resp = await fetch(`${AI_SERVICE_URL}/job-postings/${numericId}`);
+            if (!resp.ok) throw new Error('Failed to fetch job');
             const item = await resp.json();
             const parts = [];
             if (item.description) parts.push(String(item.description).trim());
@@ -106,13 +277,14 @@
                 parts.push(`Required Qualifications:\n${bullets}`);
             }
             jobDescEl.value = parts.join('\n\n');
-            sessionStorage.setItem('job_id', id);
             if (testingMode) {
-                const gen = await fetch(`${AI_SERVICE_URL}/app-test/generate-candidate/${id}`, { method: 'POST' });
-                const cand = await gen.json();
-                if (cand.candidate_id) sessionStorage.setItem('candidate_id', cand.candidate_id);
-                if (cand.profile) sessionStorage.setItem('candidate_profile', JSON.stringify(cand.profile));
-                resumeEl.value = cand.resume || '';
+                const gen = await fetch(`${AI_SERVICE_URL}/app-test/generate-candidate/${numericId}`, { method: 'POST' });
+                if (gen.ok) {
+                    const cand = await gen.json();
+                    if (cand.candidate_id) sessionStorage.setItem('candidate_id', cand.candidate_id);
+                    if (cand.profile) sessionStorage.setItem('candidate_profile', JSON.stringify(cand.profile));
+                    resumeEl.value = cand.resume || '';
+                }
             }
             updateStartButtonState();
         } catch (e) {
@@ -121,68 +293,311 @@
     }
 
     function renderJobPostings(items) {
-        if (!Array.isArray(items) || items.length === 0) {
+        if (!Array.isArray(items) || !items.length) {
             postingsTbody.innerHTML = '<tr><td colspan="3" class="text-muted">No job postings found</td></tr>';
             return;
         }
         postingsTbody.innerHTML = '';
         for (const item of items) {
             const tr = document.createElement('tr');
+            if (selectedJobId && Number(item.id) === Number(selectedJobId)) {
+                tr.classList.add('table-primary');
+            }
             tr.innerHTML = `
                 <td><code>${item.id}</code></td>
-                <td>${item.job_title}</td>
-                <td>
-                    <button class="btn btn-sm btn-outline-primary" data-id="${item.id}">Select</button>
+                <td>${escapeHtml(item.job_title)}</td>
+                <td class="text-end">
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button type="button" class="btn btn-outline-primary" data-action="select" data-id="${item.id}">Select</button>
+                        <button type="button" class="btn btn-outline-danger" data-action="delete" data-id="${item.id}">Delete</button>
+                    </div>
                 </td>
             `;
             postingsTbody.appendChild(tr);
         }
-        // Delegate click to tbody for performance
-        postingsTbody.onclick = async (ev) => {
-            const btn = ev.target.closest('button[data-id]');
-            if (!btn) return;
-            const id = btn.getAttribute('data-id');
-            await applyJobSelection(id);
-        };
     }
 
     async function loadJobPostings() {
         try {
             const resp = await fetch(`${AI_SERVICE_URL}/job-postings`);
+            if (!resp.ok) throw new Error('Failed to fetch');
             const data = await resp.json();
-            const items = data.items || [];
-            // Populate table
-            renderJobPostings(items);
+            jobPostingsCache = Array.isArray(data.items) ? data.items : [];
+            renderJobPostings(jobPostingsCache);
+            populateResumeJobOptions();
         } catch (e) {
             console.error('Failed to load job postings', e);
         }
     }
 
+    function renderResumes(items) {
+        if (!Array.isArray(items) || !items.length) {
+            resumesTbody.innerHTML = '<tr><td colspan="3" class="text-muted">No resumes found</td></tr>';
+            return;
+        }
+        resumesTbody.innerHTML = '';
+        for (const item of items) {
+            const tr = document.createElement('tr');
+            const jobCell = item.job_title
+                ? escapeHtml(item.job_title)
+                : (item.job_id ? `Job #${item.job_id}` : '');
+            tr.innerHTML = `
+                <td>
+                    <div class="fw-semibold">${escapeHtml(item.display_name)}</div>
+                    <div class="text-muted small">${escapeHtml(item.candidate_id)}</div>
+                </td>
+                <td>${jobCell}</td>
+                <td class="text-end">
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button type="button" class="btn btn-outline-primary" data-action="use" data-id="${item.candidate_id}">Use</button>
+                        <button type="button" class="btn btn-outline-danger" data-action="delete" data-id="${item.candidate_id}">Delete</button>
+                    </div>
+                </td>
+            `;
+            resumesTbody.appendChild(tr);
+        }
+    }
 
-    // Keep button state in sync with user typing
+    async function loadResumes() {
+        try {
+            const resp = await fetch(`${AI_SERVICE_URL}/candidate-resumes`);
+            if (!resp.ok) throw new Error('Failed to fetch');
+            const data = await resp.json();
+            renderResumes(Array.isArray(data.items) ? data.items : []);
+        } catch (e) {
+            console.error('Failed to load resumes', e);
+        }
+    }
+
+    function populateResumeJobOptions() {
+        if (!resumeJobSelect) return;
+        resumeJobSelect.innerHTML = '';
+        if (!jobPostingsCache.length) {
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = 'No job postings available';
+            resumeJobSelect.appendChild(opt);
+            resumeJobSelect.disabled = true;
+            return;
+        }
+        resumeJobSelect.disabled = false;
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = 'Select job…';
+        resumeJobSelect.appendChild(placeholder);
+        const preferredValue = selectedJobId ? String(selectedJobId) : '';
+        for (const job of jobPostingsCache) {
+            const opt = document.createElement('option');
+            opt.value = job.id;
+            opt.textContent = job.job_title;
+            if (preferredValue && String(job.id) === preferredValue) {
+                opt.selected = true;
+            }
+            resumeJobSelect.appendChild(opt);
+        }
+        if (!resumeJobSelect.value && jobPostingsCache.length) {
+            resumeJobSelect.value = jobPostingsCache[0].id;
+        }
+    }
+
     jobDescEl.addEventListener('input', updateStartButtonState);
     resumeEl.addEventListener('input', updateStartButtonState);
 
-    document.getElementById('start-button').addEventListener('click', () => {
+    startBtn.addEventListener('click', () => {
         const jd = jobDescEl.value;
         const resume = resumeEl.value;
-        // Read selected interview duration (seconds); default to 5 minutes
         const sel = document.getElementById('time-limit');
         const timeLimit = sel ? (parseInt(sel.value, 10) || 300) : 300;
-        const wordLimit = 1500; // ~1500 words
+        const wordLimit = 1500;
         sessionStorage.setItem('job_description', jd);
         sessionStorage.setItem('candidate_resume', resume);
         const cid = sessionStorage.getItem('candidate_id') || '';
         sessionStorage.setItem('candidate_id', cid);
         const cprof = sessionStorage.getItem('candidate_profile') || '';
         sessionStorage.setItem('candidate_profile', cprof);
-        const jobId = sessionStorage.getItem('job_id') || '';
+        const jobId = selectedJobId ? String(selectedJobId) : (sessionStorage.getItem('job_id') || '');
         sessionStorage.setItem('job_id', jobId);
         sessionStorage.setItem('time_limit', timeLimit);
         sessionStorage.setItem('word_limit', wordLimit);
         window.location.href = 'chat.html';
     });
-    
+
+    postingsTbody.addEventListener('click', async (ev) => {
+        const btn = ev.target.closest('button[data-id][data-action]');
+        if (!btn) return;
+        const id = btn.getAttribute('data-id');
+        const action = btn.getAttribute('data-action');
+        if (action === 'select') {
+            await applyJobSelection(id);
+        } else if (action === 'delete') {
+            if (!confirm('Delete this job posting?')) return;
+            try {
+                const resp = await fetch(`${AI_SERVICE_URL}/job-postings/${id}`, { method: 'DELETE' });
+                if (!resp.ok) throw new Error('Failed to delete job');
+                if (selectedJobId && Number(selectedJobId) === Number(id)) {
+                    selectedJobId = null;
+                    sessionStorage.removeItem('job_id');
+                    jobDescEl.value = '';
+                    updateStartButtonState();
+                }
+                await loadJobPostings();
+            } catch (e) {
+                console.error('Failed to delete job', e);
+                alert('Could not delete job posting. See console for details.');
+            }
+        }
+    });
+
+    resumesTbody.addEventListener('click', async (ev) => {
+        const btn = ev.target.closest('button[data-id][data-action]');
+        if (!btn) return;
+        const id = btn.getAttribute('data-id');
+        const action = btn.getAttribute('data-action');
+        if (action === 'use') {
+            try {
+                const resp = await fetch(`${AI_SERVICE_URL}/candidate-resumes/${id}`);
+                if (!resp.ok) throw new Error('Failed to fetch resume');
+                const detail = await resp.json();
+                const activeId = selectedJobId != null ? selectedJobId : NaN;
+                if (detail.job_id && Number(detail.job_id) !== Number(activeId)) {
+                    await applyJobSelection(detail.job_id);
+                }
+                resumeEl.value = detail.resume || '';
+                sessionStorage.setItem('candidate_id', detail.candidate_id || '');
+                sessionStorage.setItem('candidate_resume', detail.resume || '');
+                if (detail.display_name) {
+                    sessionStorage.setItem('candidate_display_name', detail.display_name);
+                }
+                updateStartButtonState();
+            } catch (e) {
+                console.error('Failed to apply resume', e);
+                alert('Could not load resume. See console for details.');
+            }
+        } else if (action === 'delete') {
+            if (!confirm('Delete this saved resume?')) return;
+            try {
+                const resp = await fetch(`${AI_SERVICE_URL}/candidate-resumes/${id}`, { method: 'DELETE' });
+                if (!resp.ok) throw new Error('Failed to delete resume');
+                if ((sessionStorage.getItem('candidate_id') || '') === id) {
+                    sessionStorage.removeItem('candidate_id');
+                    sessionStorage.removeItem('candidate_resume');
+                }
+                await loadResumes();
+            } catch (e) {
+                console.error('Failed to delete resume', e);
+                alert('Could not delete resume. See console for details.');
+            }
+        }
+    });
+
+    if (addPostingBtn && jobModalEl) {
+        addPostingBtn.addEventListener('click', () => {
+            if (jobForm) jobForm.reset();
+            const modal = getModal(jobModalEl);
+            if (modal) modal.show();
+        });
+    }
+
+    if (jobForm) {
+        jobForm.addEventListener('submit', async (ev) => {
+            ev.preventDefault();
+            const formData = new FormData(jobForm);
+            const payload = {
+                job_title: (formData.get('job_title') || '').toString().trim(),
+                company: (formData.get('company') || '').toString().trim(),
+                location: (formData.get('location') || '').toString().trim(),
+                experience_level: (formData.get('experience_level') || '').toString().trim(),
+                category: (formData.get('category') || '').toString().trim(),
+                description: (formData.get('description') || '').toString().trim(),
+                responsibilities: splitLines(formData.get('responsibilities') || ''),
+                required_qualifications: splitLines(formData.get('required_qualifications') || ''),
+            };
+            if (!payload.job_title || !payload.description) {
+                alert('Job title and description are required.');
+                return;
+            }
+            try {
+                const resp = await fetch(`${AI_SERVICE_URL}/job-postings`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({}));
+                    throw new Error(err.detail || 'Failed to create job');
+                }
+                const created = await resp.json();
+                const modal = getModal(jobModalEl);
+                if (modal) modal.hide();
+                jobForm.reset();
+                await loadJobPostings();
+                if (created && created.id) {
+                    await applyJobSelection(created.id);
+                }
+            } catch (e) {
+                console.error('Failed to save job', e);
+                alert(`Could not save job: ${e.message || e}`);
+            }
+        });
+    }
+
+    if (addResumeBtn && resumeModalEl) {
+        addResumeBtn.addEventListener('click', () => {
+            if (resumeForm) resumeForm.reset();
+            populateResumeJobOptions();
+            const modal = getModal(resumeModalEl);
+            if (modal) modal.show();
+        });
+    }
+
+    if (resumeForm) {
+        resumeForm.addEventListener('submit', async (ev) => {
+            ev.preventDefault();
+            const formData = new FormData(resumeForm);
+            const displayName = (formData.get('display_name') || '').toString().trim();
+            const jobId = (formData.get('job_id') || '').toString().trim();
+            const resumeText = (formData.get('resume') || '').toString();
+            if (!displayName || !jobId || !resumeText.trim()) {
+                alert('Please provide a label, job, and resume text.');
+                return;
+            }
+            const slug = displayName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+            const candidateId = `${slug || 'resume'}-${Date.now().toString(36)}`;
+            const payload = {
+                candidate_id: candidateId,
+                display_name: displayName,
+                job_id: Number(jobId),
+                resume: resumeText,
+            };
+            try {
+                const resp = await fetch(`${AI_SERVICE_URL}/candidate-resumes`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({}));
+                    throw new Error(err.detail || 'Failed to save resume');
+                }
+                const modal = getModal(resumeModalEl);
+                if (modal) modal.hide();
+                resumeForm.reset();
+                await loadResumes();
+                if (!selectedJobId || Number(selectedJobId) !== Number(jobId)) {
+                    await applyJobSelection(jobId);
+                }
+                resumeEl.value = resumeText;
+                sessionStorage.setItem('candidate_id', candidateId);
+                sessionStorage.setItem('candidate_resume', resumeText);
+                sessionStorage.setItem('candidate_display_name', displayName);
+                updateStartButtonState();
+            } catch (e) {
+                console.error('Failed to save resume', e);
+                alert(`Could not save resume: ${e.message || e}`);
+            }
+        });
+    }
+
     async function loadSessions() {
         try {
             const resp = await fetch(`${AI_SERVICE_URL}/api/v1/sessions`);
@@ -203,19 +618,17 @@
         }
     }
 
-    refreshBtn.addEventListener('click', loadSessions);
-    refreshPostingsBtn.addEventListener('click', async () => {
-        await loadJobPostings();
-    });
+    if (refreshSessionsBtn) refreshSessionsBtn.addEventListener('click', loadSessions);
+    if (refreshPostingsBtn) refreshPostingsBtn.addEventListener('click', async () => { await loadJobPostings(); });
+    if (refreshResumesBtn) refreshResumesBtn.addEventListener('click', async () => { await loadResumes(); });
 
-    // bootstrap: clear inputs, enable Testing Mode, then load data
     jobDescEl.value = '';
     resumeEl.value = '';
     updateStartButtonState();
-    // Turn on testing mode by default
     try { testToggle.checked = true; } catch (_) {}
     testingMode = true;
     loadJobPostings();
+    loadResumes();
     loadSessions();
     </script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

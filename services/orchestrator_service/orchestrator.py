@@ -72,7 +72,7 @@ class Orchestrator:
                     state.last_followup_hook = hook
                     return {"question_text": q_text, "question_type": "targeted_followup"}
 
-        if phase == "warm_up":
+        if phase == "experience":
             if answer is not None and getattr(state, "last_question_text", None):
                 log_question_response(
                     stage=phase,
@@ -82,7 +82,10 @@ class Orchestrator:
                     session_id=getattr(state, "session_id", None),
                     candidate_id=getattr(state, "candidate_id", None),
                 )
-            step = state.current_warmup_step
+            step = state.current_experience_step
+            if step is None:
+                state.advance_phase()
+                return await self.decide_next_action(state, None)
             func_map = {
                 "select_project": warmup_select_project,
                 "project_overview": warmup_project_overview,
@@ -95,18 +98,6 @@ class Orchestrator:
                 "resolution": warmup_resolution,
                 "outcome": warmup_outcome,
                 "reflection": warmup_reflection,
-            }
-            q = await func_map[step](packet, answer)
-            if q is None:
-                state.advance_warmup_step()
-                return await self.decide_next_action(state, None)
-            state.last_question_text = q.get("question_text")
-            state.last_question_type = q.get("question_type")
-            return q
-
-        if phase == "evidence":
-            step = state.current_evidence_step
-            func_map = {
                 "components_list": evidence_components_list,
                 "component_details": evidence_component_details,
                 "choice_space": evidence_choice_space,
@@ -115,20 +106,13 @@ class Orchestrator:
                 "tradeoff_exploration": evidence_tradeoff_exploration,
                 "tradeoff_reasoning": evidence_tradeoff_reasoning,
             }
-            q = await func_map[step](packet, answer)
-
-            if answer is not None and getattr(state, "last_question_text", None):
-                log_question_response(
-                    stage="evidence",
-                    question_type=getattr(state, "last_question_type", ""),
-                    question_text=getattr(state, "last_question_text", ""),
-                    answer_text=answer,
-                    session_id=getattr(state, "session_id", None),
-                    candidate_id=getattr(state, "candidate_id", None),
-                )
-
+            handler = func_map.get(step)
+            if handler is None:
+                state.advance_experience_step()
+                return await self.decide_next_action(state, None)
+            q = await handler(packet, answer)
             if q is None:
-                state.advance_evidence_step()
+                state.advance_experience_step()
                 return await self.decide_next_action(state, None)
             state.last_question_text = q.get("question_text")
             state.last_question_type = q.get("question_type")

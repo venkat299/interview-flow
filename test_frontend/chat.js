@@ -159,6 +159,7 @@ function initChat() {
 
     function prettyStageName(stage) {
         const m = {
+            'experience': 'Experience',
             'warm_up': 'Warm-Up',
             'evidence': 'Evidence',
             'theory': 'Theory',
@@ -173,6 +174,7 @@ function initChat() {
         stageBadge.textContent = label;
         stageBadge.className = 'badge rounded-pill';
         switch (stage) {
+            case 'experience':
             case 'warm_up':
                 stageBadge.classList.add('bg-info');
                 break;
@@ -285,8 +287,8 @@ function initChat() {
             try { msg = JSON.parse(ev.data); } catch (_) { return; }
             const { event, payload } = msg || {};
             if (event === 'session_started') {
-                // Default initial stage is warm_up
-                updateStageBadge('warm_up');
+                // Default initial stage is experience
+                updateStageBadge('experience');
                 return;
             } else if (event === 'stage_changed') {
                 const stg = (payload && payload.stage) || '';

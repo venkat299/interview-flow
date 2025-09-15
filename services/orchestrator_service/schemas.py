@@ -126,3 +126,4 @@ class ContextPacket(BaseModel):
     verifications: List[VerificationResult] = Field(default_factory=list)
     notes: List[str] = Field(default_factory=list)
     role_skill_tags: List[str] = Field(default_factory=list)
+    experience_plan: List[str] = Field(default_factory=list)

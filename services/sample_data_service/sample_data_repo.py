@@ -1,7 +1,7 @@
 import json
 import os
 import sqlite3
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 from gateway_service.config import settings
 
@@ -21,6 +21,7 @@ def get_connection() -> sqlite3.Connection:
     _ensure_dir(db_path)
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
 
@@ -48,6 +49,7 @@ def init_db() -> None:
                 candidate_id TEXT PRIMARY KEY,
                 resume TEXT NOT NULL,
                 job_id INTEGER NOT NULL,
+                display_name TEXT,
                 FOREIGN KEY(job_id) REFERENCES job_postings(id)
             )
             """
@@ -75,6 +77,11 @@ def init_db() -> None:
             )
             """
         )
+        # Ensure optional columns exist without clobbering existing data
+        cur = conn.execute("PRAGMA table_info(candidate_resumes)")
+        columns = {row["name"] for row in cur.fetchall()}
+        if "display_name" not in columns:
+            conn.execute("ALTER TABLE candidate_resumes ADD COLUMN display_name TEXT")
         conn.commit()
 
 
@@ -121,6 +128,71 @@ def list_job_postings() -> List[Dict[str, Any]]:
         return [{"id": r["id"], "job_title": r["job_title"]} for r in cur.fetchall()]
 
 
+def create_job_posting(
+    job_title: str,
+    *,
+    company: Optional[str] = None,
+    location: Optional[str] = None,
+    experience_level: Optional[str] = None,
+    category: Optional[str] = None,
+    description: Optional[str] = None,
+    responsibilities: Optional[Iterable[str]] = None,
+    required_qualifications: Optional[Iterable[str]] = None,
+) -> Dict[str, Any]:
+    if not job_title:
+        raise ValueError("Job title is required")
+
+    def _normalize(values: Optional[Iterable[str]]) -> List[str]:
+        if values is None:
+            return []
+        if isinstance(values, str):
+            return [line.strip() for line in values.splitlines() if line.strip()]
+        normalized: List[str] = []
+        for item in values:
+            text = str(item or "").strip()
+            if text:
+                normalized.append(text)
+        return normalized
+
+    responsibilities_list = _normalize(responsibilities)
+    qualifications_list = _normalize(required_qualifications)
+    with get_connection() as conn:
+        cur = conn.execute(
+            """
+            INSERT INTO job_postings(
+                job_title, company, location, experience_level, category,
+                description, responsibilities, required_qualifications
+            ) VALUES(?,?,?,?,?,?,?,?)
+            """,
+            (
+                job_title.strip(),
+                (company or "").strip() or None,
+                (location or "").strip() or None,
+                (experience_level or "").strip() or None,
+                (category or "").strip() or None,
+                (description or "").strip(),
+                json.dumps(responsibilities_list),
+                json.dumps(qualifications_list),
+            ),
+        )
+        conn.commit()
+        new_id = cur.lastrowid
+    item = get_job_posting(new_id)
+    if not item:
+        raise ValueError("Failed to create job posting")
+    return item
+
+
+def delete_job_posting(job_id: int) -> bool:
+    with get_connection() as conn:
+        conn.execute("DELETE FROM candidate_sessions WHERE job_id = ?", (job_id,))
+        conn.execute("DELETE FROM candidate_resumes WHERE job_id = ?", (job_id,))
+        conn.execute("DELETE FROM candidates WHERE job_id = ?", (job_id,))
+        cur = conn.execute("DELETE FROM job_postings WHERE id = ?", (job_id,))
+        conn.commit()
+        return cur.rowcount > 0
+
+
 def get_job_posting(job_id: int) -> Optional[Dict[str, Any]]:
     with get_connection() as conn:
         cur = conn.execute(
@@ -147,22 +219,60 @@ def get_job_posting(job_id: int) -> Optional[Dict[str, Any]]:
         }
 
 
-def upsert_candidate_resume(candidate_id: str, resume: str, job_id: int) -> None:
+def upsert_candidate_resume(
+    candidate_id: str,
+    resume: str,
+    job_id: int,
+    display_name: Optional[str] = None,
+) -> None:
+    if not candidate_id:
+        raise ValueError("candidate_id is required")
+    if job_id is None:
+        raise ValueError("job_id is required")
     with get_connection() as conn:
         conn.execute(
             """
-            INSERT OR REPLACE INTO candidate_resumes(candidate_id, resume, job_id)
-            VALUES(?,?,?)
+            INSERT INTO candidate_resumes(candidate_id, resume, job_id, display_name)
+            VALUES(?,?,?,?)
+            ON CONFLICT(candidate_id) DO UPDATE SET
+                resume = excluded.resume,
+                job_id = excluded.job_id,
+                display_name = COALESCE(excluded.display_name, candidate_resumes.display_name)
             """,
-            (candidate_id, resume, job_id),
+            (candidate_id, resume, job_id, display_name),
         )
         conn.commit()
+
+
+def list_candidate_resumes() -> List[Dict[str, Any]]:
+    with get_connection() as conn:
+        cur = conn.execute(
+            """
+            SELECT
+                cr.candidate_id,
+                cr.job_id,
+                COALESCE(cr.display_name, cr.candidate_id) AS display_name,
+                jp.job_title
+            FROM candidate_resumes cr
+            LEFT JOIN job_postings jp ON cr.job_id = jp.id
+            ORDER BY display_name COLLATE NOCASE
+            """
+        )
+        return [
+            {
+                "candidate_id": row["candidate_id"],
+                "job_id": row["job_id"],
+                "display_name": row["display_name"],
+                "job_title": row["job_title"],
+            }
+            for row in cur.fetchall()
+        ]
 
 
 def get_candidate_resume(candidate_id: str) -> Optional[Dict[str, Any]]:
     with get_connection() as conn:
         cur = conn.execute(
-            "SELECT candidate_id, resume, job_id FROM candidate_resumes WHERE candidate_id = ?",
+            "SELECT candidate_id, resume, job_id, display_name FROM candidate_resumes WHERE candidate_id = ?",
             (candidate_id,),
         )
         row = cur.fetchone()
@@ -172,6 +282,7 @@ def get_candidate_resume(candidate_id: str) -> Optional[Dict[str, Any]]:
             "candidate_id": row["candidate_id"],
             "resume": row["resume"],
             "job_id": row["job_id"],
+            "display_name": row["display_name"],
         }
 
 
@@ -214,3 +325,15 @@ def link_candidate_session(candidate_id: str, job_id: int, session_id: str) -> N
             (candidate_id, job_id, session_id),
         )
         conn.commit()
+
+
+def delete_candidate_resume(candidate_id: str) -> bool:
+    with get_connection() as conn:
+        conn.execute("DELETE FROM candidate_sessions WHERE candidate_id = ?", (candidate_id,))
+        conn.execute("DELETE FROM candidates WHERE candidate_id = ?", (candidate_id,))
+        cur = conn.execute(
+            "DELETE FROM candidate_resumes WHERE candidate_id = ?",
+            (candidate_id,),
+        )
+        conn.commit()
+        return cur.rowcount > 0

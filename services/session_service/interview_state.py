@@ -8,8 +8,8 @@ from orchestrator_service.schemas import ContextPacket
 class InterviewState:
     """Tracks the shared context packet and phase progression."""
 
-    phases: List[str] = ["warm_up", "evidence", "theory", "wrap_up"]
-    warmup_steps: List[str] = [
+    phases: List[str] = ["experience", "theory", "wrap_up"]
+    default_experience_steps: List[str] = [
         "select_project",
         "project_overview",
         "role",
@@ -21,8 +21,6 @@ class InterviewState:
         "resolution",
         "outcome",
         "reflection",
-    ]
-    evidence_steps: List[str] = [
         "components_list",
         "component_details",
         "choice_space",
@@ -49,8 +47,11 @@ class InterviewState:
         self.packet = packet
         self.phase_index = 0
         # Stage-based step indexes
-        self.warmup_index = 0
-        self.evidence_index = 0
+        plan = list(packet.experience_plan or [])
+        if not plan:
+            plan = list(self.default_experience_steps)
+        self.experience_plan: List[str] = plan
+        self.experience_index = 0
         self.theory_index = 0
         self.theory_skill_index = 0
         self.wrapup_index = 0
@@ -75,24 +76,16 @@ class InterviewState:
             self.phase_index += 1
 
     @property
-    def current_warmup_step(self) -> str:
-        return self.warmup_steps[self.warmup_index]
+    def current_experience_step(self) -> Optional[str]:
+        if self.experience_index >= len(self.experience_plan):
+            return None
+        return self.experience_plan[self.experience_index]
 
-    def advance_warmup_step(self) -> None:
-        if self.warmup_index < len(self.warmup_steps) - 1:
-            self.warmup_index += 1
+    def advance_experience_step(self) -> None:
+        if self.experience_index < len(self.experience_plan) - 1:
+            self.experience_index += 1
         else:
-            # No more warm-up steps; advance to next phase
-            self.advance_phase()
-
-    @property
-    def current_evidence_step(self) -> str:
-        return self.evidence_steps[self.evidence_index]
-
-    def advance_evidence_step(self) -> None:
-        if self.evidence_index < len(self.evidence_steps) - 1:
-            self.evidence_index += 1
-        else:
+            self.experience_index += 1
             self.advance_phase()
 
     @property
@@ -128,4 +121,3 @@ class InterviewState:
         """Convenience helper to reduce remaining interview time."""
         remaining = self.packet.time_remaining_min or self.packet.duration_min
         self.packet.time_remaining_min = max(remaining - minutes, 0)
-

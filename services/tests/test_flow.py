@@ -2,6 +2,8 @@ import pytest
 
 from orchestrator_service import llm_api as ai
 from orchestrator_service.schemas import ContextPacket, ProjectContext
+from session_service.interview_state import InterviewState
+from orchestrator_service.orchestrator import Orchestrator
 
 
 @pytest.mark.asyncio
@@ -66,3 +68,32 @@ async def test_run_interview_flow(monkeypatch):
         "stage_3_eval",
         "stage_4_summary",
     ]
+
+
+@pytest.mark.asyncio
+async def test_experience_plan_respected(monkeypatch):
+    async def fake_execute(task_name, system_prompt, user_prompt=None):
+        if task_name == "question_generation":
+            return {"question_text": "Question"}
+        if task_name == "stage_1_parse":
+            return {"goal": "demo", "constraints": []}
+        if task_name == "skill_tag_refinement":
+            return {"tags": []}
+        raise AssertionError(task_name)
+
+    monkeypatch.setattr(ai.gateway, "execute_task", fake_execute)
+
+    packet = ContextPacket(
+        jd_text="JD",
+        resume_text="Resume",
+        selected_project="demo",
+        experience_plan=["components_list", "project_overview"],
+    )
+    state = InterviewState(packet)
+    orch = Orchestrator()
+
+    first = await orch.loop(state)
+    assert first["question_type"] == "evidence_components_list"
+
+    second = await orch.loop(state, "listed components")
+    assert second["question_type"] == "warmup_project_overview"

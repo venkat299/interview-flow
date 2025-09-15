@@ -99,6 +99,25 @@ def list_job_postings():
     return {"items": samples.list_job_postings()}
 
 
+@app.post("/job-postings")
+def create_job_posting(payload: dict):
+    try:
+        responsibilities = payload.get("responsibilities")
+        qualifications = payload.get("required_qualifications")
+        return samples.create_job_posting(
+            payload.get("job_title", ""),
+            company=payload.get("company"),
+            location=payload.get("location"),
+            experience_level=payload.get("experience_level"),
+            category=payload.get("category"),
+            description=payload.get("description"),
+            responsibilities=responsibilities,
+            required_qualifications=qualifications,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
 @app.get("/job-postings/{job_id}")
 def get_job_posting(job_id: int):
     item = samples.get_job_posting(job_id)
@@ -107,14 +126,33 @@ def get_job_posting(job_id: int):
     return item
 
 
+@app.delete("/job-postings/{job_id}")
+def delete_job_posting(job_id: int):
+    removed = samples.delete_job_posting(job_id)
+    if not removed:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return {"status": "deleted"}
+
+
 @app.post("/candidate-resumes")
 def upsert_candidate_resume(payload: dict):
-    samples.upsert_candidate_resume(
-        payload.get("candidate_id"),
-        payload.get("resume", ""),
-        int(payload.get("job_id")),
-    )
+    try:
+        job_id = payload.get("job_id")
+        job_id_int = int(job_id) if job_id is not None else None
+        samples.upsert_candidate_resume(
+            payload.get("candidate_id"),
+            payload.get("resume", ""),
+            job_id_int,
+            payload.get("display_name"),
+        )
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     return {"status": "ok"}
+
+
+@app.get("/candidate-resumes")
+def list_candidate_resumes():
+    return {"items": samples.list_candidate_resumes()}
 
 
 @app.get("/candidate-resumes/{candidate_id}")
@@ -123,6 +161,14 @@ def get_candidate_resume(candidate_id: str):
     if not item:
         raise HTTPException(status_code=404, detail="Resume not found")
     return item
+
+
+@app.delete("/candidate-resumes/{candidate_id}")
+def delete_candidate_resume(candidate_id: str):
+    removed = samples.delete_candidate_resume(candidate_id)
+    if not removed:
+        raise HTTPException(status_code=404, detail="Resume not found")
+    return {"status": "deleted"}
 
 
 @app.post("/app-test/generate-candidate/{job_id}")
