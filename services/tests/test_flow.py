@@ -54,7 +54,6 @@ async def test_run_interview_flow(monkeypatch):
 
     result = await ai.run_interview(packet)
 
-    assert [v.skill for v in result.verifications] == ["python", "db"]
     assert call_order == [
         "stage_0_analysis",
         "stage_1_intro",

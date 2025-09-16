@@ -15,7 +15,6 @@ class InterviewState:
     ]
     wrapup_steps: List[str] = [
         "feedback",
-        "closing",
     ]
 
     def __init__(
@@ -26,8 +25,6 @@ class InterviewState:
     ) -> None:
         self.packet = packet
         self.phase_index = 0
-        self.theory_index = 0
-        self.theory_skill_index = 0
         self.wrapup_index = 0
         self.qa_queue: List[dict] = []
         self.qa_queue_index = 0

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from langgraph.graph import StateGraph, START, END
 
-from .schemas import ContextPacket, VerificationResult
+from .schemas import ContextPacket
 from .programs.stage0_analysis import Stage0AnalysisProgram, JDResumeAnalysisInput
 from .programs.stage1_intro import Stage1IntroProgram, IntroModuleInput
 from .programs.stage2_qa import Stage2QAProgram, Stage2QAInput

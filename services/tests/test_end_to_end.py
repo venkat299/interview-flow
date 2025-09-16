@@ -49,7 +49,11 @@ async def test_run_interview_end_to_end(monkeypatch):
         if task_name == "stage_3_eval":
             return {"result": "pass", "rationale": "ok"}
         if task_name == "question_generation":
-            return {"question_text": "feedback?"}
+            assert "thanks the candidate" in system_prompt.lower()
+            assert "warm compliment" in system_prompt.lower()
+            return {
+                "question_text": "Thanks for your time today — your Python insights were impressive. Could you share how this interview felt for you?"
+            }
         if task_name == "stage_4_summary":
             return {"strengths": ["reasoning"], "risks": [], "follow_ups": []}
         return {}
