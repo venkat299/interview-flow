@@ -1,6 +1,7 @@
 """Core AI interview utilities."""
 
 from typing import List, Optional
+from types import SimpleNamespace
 
 from .schemas import (
     InterviewRequest,
@@ -9,6 +10,7 @@ from .schemas import (
     EvaluationRequest,
     EvaluationResponse,
     ContextPacket,
+    VerificationResult,
     FocusAreaQuestions,
     FocusAreaExchange,
 )
@@ -24,6 +26,12 @@ from .programs.stage0_analysis import (
 )
 from .programs.stage1_intro import Stage1IntroProgram, IntroModuleInput
 from .programs.stage2_qa import Stage2QAProgram, Stage2QAInput
+from .programs.stage3_theory import (
+    TheoryQuestionProgram,
+    TheoryQuestionInput,
+    TheoryEvalProgram,
+    TheoryEvalInput,
+)
 from .programs.stage4_wrapup import (
     WrapUpProgram,
     WrapUpInput,
@@ -192,6 +200,8 @@ _scoring = ScoringEngine()
 _stage0 = Stage0AnalysisProgram()
 _intro = Stage1IntroProgram()
 _qa_plan = Stage2QAProgram()
+_theory_question = TheoryQuestionProgram()
+_theory_eval = TheoryEvalProgram()
 _wrap_up = WrapUpProgram()
 _graph = build_interview_graph()
 
