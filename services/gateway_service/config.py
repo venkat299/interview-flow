@@ -22,7 +22,19 @@ _ROUTER_CFG: Dict[str, Any] = _load_router_config()
 _PROVIDERS: Dict[str, Any] = _ROUTER_CFG.get("providers", {}) if isinstance(_ROUTER_CFG, dict) else {}
 _LOCAL_PROVIDER: Dict[str, Any] = _PROVIDERS.get("local", {}) if isinstance(_PROVIDERS, dict) else {}
 _LOCAL_BASE_URL_YAML: str = (_LOCAL_PROVIDER.get("base_url") or "") if isinstance(_LOCAL_PROVIDER, dict) else ""
-_LOCAL_MODEL_YAML: str = (_LOCAL_PROVIDER.get("model") or "openai/gpt-oss-20b") if isinstance(_LOCAL_PROVIDER, dict) else "openai/gpt-oss-20b"
+_LOCAL_MODEL_YAML: str = (
+    _LOCAL_PROVIDER.get("model") or "openai/gpt-oss-20b"
+) if isinstance(_LOCAL_PROVIDER, dict) else "openai/gpt-oss-20b"
+_AUTO_PROVIDER: Dict[str, Any] = _PROVIDERS.get("auto_answer", {}) if isinstance(_PROVIDERS, dict) else {}
+_AUTO_BASE_URL_YAML: str = (
+    _AUTO_PROVIDER.get("base_url") or ""
+) if isinstance(_AUTO_PROVIDER, dict) else ""
+_AUTO_MODEL_YAML: str = (
+    _AUTO_PROVIDER.get("model") or _LOCAL_MODEL_YAML
+) if isinstance(_AUTO_PROVIDER, dict) else _LOCAL_MODEL_YAML
+_AUTO_API_KEY_YAML: str = (
+    _AUTO_PROVIDER.get("api_key") or ""
+) if isinstance(_AUTO_PROVIDER, dict) else ""
 
 
 class Settings:
@@ -42,6 +54,10 @@ class Settings:
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
     # Local OpenAI-compatible server URL; prefer llm_router_config.yml, allow env override
     local_llm_url: str = os.getenv("LOCAL_LLM_URL", _LOCAL_BASE_URL_YAML)
+    # Dedicated provider configuration for the auto-answer generator
+    auto_llm_url: str = os.getenv("AUTO_LLM_URL", _AUTO_BASE_URL_YAML or _LOCAL_BASE_URL_YAML)
+    auto_llm_model: str = os.getenv("AUTO_LLM_MODEL", _AUTO_MODEL_YAML)
+    auto_llm_api_key: str = os.getenv("AUTO_LLM_API_KEY", _AUTO_API_KEY_YAML)
 
     # --- Logging / Tracing configuration ---
     # Standard log level: DEBUG, INFO, WARNING, ERROR, CRITICAL, or TRACE (custom)

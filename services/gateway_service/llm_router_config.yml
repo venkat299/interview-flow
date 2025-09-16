@@ -22,6 +22,14 @@ providers:
     temperature: 1.0
     # timeout: 120
 
+  # Dedicated auto-answering model. Override AUTO_LLM_URL/ AUTO_LLM_MODEL to
+  # point at a different LLM endpoint without editing this file.
+  auto_answer:
+    base_url: https://6311e26c90cd.ngrok-free.app/v1/chat/completions
+    api_key: ""
+    model: openai/gpt-oss-20b
+    temperature: 0.8
+
   # Optional: keep OpenAI config for fallback/manual switching
   # openai:
   #   base_url: https://api.openai.com/v1/chat/completions
@@ -35,6 +43,8 @@ tasks:
     provider: local
   answer_evaluation:
     provider: local
+  auto_answer_generation:
+    provider: auto_answer
   # Heavier tasks used by the app-test endpoints
   fake_candidate_profile:
     provider: local

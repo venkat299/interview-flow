@@ -283,9 +283,9 @@ async def generate_auto_answer_for_session(
         pass
 
     # Route via the gateway. We ask for JSON; if the provider returns text,
-    # use the question_generation task for a robust fallback to plain text.
+    # the gateway will fall back to a plain-text auto-answer payload.
     data = await gateway.execute_task(
-        task_name="question_generation",
+        task_name="auto_answer_generation",
         system_prompt=system_prompt,
         user_prompt=user_prompt,
     )
