@@ -19,6 +19,9 @@ from json_repair import repair_json
 from .config import settings
 
 
+GEMINI_PROVIDER_NAMES = {"gemini", "google_gemini", "google", "google_studio", "google-studio"}
+
+
 class AIGateway:
     """Singleton gateway managing HTTP clients for LLM providers."""
 
@@ -52,6 +55,12 @@ class AIGateway:
                 "base_url": "https://api.openai.com/v1/chat/completions",
                 "api_key": settings.openai_api_key or None,
                 "model": settings.openai_model,
+            }
+        if name in GEMINI_PROVIDER_NAMES:
+            return {
+                "base_url": settings.gemini_api_url,
+                "api_key": settings.gemini_api_key or None,
+                "model": settings.gemini_model,
             }
         if name in {"auto_answer", "auto-answer", "autoanswer"}:
             return {
@@ -90,17 +99,24 @@ class AIGateway:
         if not url or not model:
             raise RuntimeError(f"Provider '{provider_name}' missing url/model configuration")
 
+        is_gemini = self._is_gemini_provider(provider_name)
         headers: Dict[str, str] = {}
-        if api_key:
+        if is_gemini:
+            if not api_key:
+                raise RuntimeError("Gemini provider requires an API key for health check")
+            headers["x-goog-api-key"] = api_key
+        elif api_key:
             headers["Authorization"] = f"Bearer {api_key}"
 
-        payload: Dict[str, Any] = {
-            "model": model,
-            "messages": [
-                {"role": "system", "content": "healthcheck"},
-                {"role": "user", "content": "ping"},
-            ],
-        }
+        messages: list[Dict[str, str]] = [
+            {"role": "system", "content": "healthcheck"},
+            {"role": "user", "content": "ping"},
+        ]
+        if is_gemini:
+            payload = self._build_gemini_payload(messages, {})
+            url = self._build_gemini_endpoint(url, model)
+        else:
+            payload = {"model": model, "messages": messages}
 
         client = self._get_client(provider_name)
         timeout = httpx.Timeout(connect=connect_timeout, read=read_timeout, write=read_timeout, pool=read_timeout)
@@ -136,16 +152,20 @@ class AIGateway:
         """Execute a task by routing it to the configured LLM provider.
 
         Resolution order:
-        - If settings.llm_provider is set, prefer that provider.
-        - Else use the provider configured for the task in YAML.
-        - If the task is missing in YAML, fall back to settings.llm_provider.
+        - If the task specifies a provider in YAML, use it.
+        - Else fall back to settings.llm_provider.
+        - Finally default to the local provider.
         """
         tasks = self.config.get("tasks", {})
         providers = self.config.get("providers", {})
 
         # Choose provider with settings taking precedence
-        task_cfg = tasks.get(task_name)
-        provider_name = (settings.llm_provider or (task_cfg or {}).get("provider") or "local").lower()
+        task_cfg = tasks.get(task_name) or {}
+        provider_name = (
+            task_cfg.get("provider")
+            or settings.llm_provider
+            or "local"
+        ).lower()
 
         # Merge provider config: YAML overrides filled by settings defaults
         yaml_provider_cfg = providers.get(provider_name) or {}
@@ -153,33 +173,57 @@ class AIGateway:
         provider_cfg: Dict[str, Optional[str]] = {**default_provider_cfg, **yaml_provider_cfg}
 
         # Resolve model: task->provider->settings default
-        model = (task_cfg or {}).get("model") or provider_cfg.get("model") or default_provider_cfg.get("model")
+        model = task_cfg.get("model") or provider_cfg.get("model") or default_provider_cfg.get("model")
         url = provider_cfg.get("base_url")
         api_key = provider_cfg.get("api_key")
         if not url or not model:
             raise ValueError(f"Provider '{provider_name}' missing required configuration (url/model)")
+
+        is_gemini = self._is_gemini_provider(provider_name)
 
         messages = [{"role": "system", "content": system_prompt}]
         if user_prompt:
             messages.append({"role": "user", "content": user_prompt})
 
         payload: Dict[str, Any] = {"model": model, "messages": messages}
+        option_overrides: Dict[str, Any] = {}
         # Optional generation controls from YAML: task overrides provider
         # Common OpenAI-compatible params: max_tokens, temperature, top_p, n, stop
         for key in ("max_tokens", "temperature", "top_p", "n", "stop", "response_format"):
-            if isinstance((task_cfg or {}).get(key), (int, float, str, list, dict)):
-                payload[key] = (task_cfg or {}).get(key)
-            elif isinstance((provider_cfg or {}).get(key), (int, float, str, list, dict)) and key not in payload:
-                payload[key] = (provider_cfg or {}).get(key)
+            if isinstance(task_cfg.get(key), (int, float, str, list, dict)):
+                option_overrides[key] = task_cfg.get(key)
+            elif isinstance(provider_cfg.get(key), (int, float, str, list, dict)) and key not in option_overrides:
+                option_overrides[key] = provider_cfg.get(key)
+            if not is_gemini and key in option_overrides:
+                payload[key] = option_overrides[key]
+
         headers: Dict[str, str] = {}
-        if api_key:
-            headers["Authorization"] = f"Bearer {api_key}"
+        if is_gemini:
+            if not api_key:
+                raise ValueError("Gemini provider requires an API key")
+            headers["x-goog-api-key"] = api_key
+            request_json = self._build_gemini_payload(messages, option_overrides)
+            request_url = self._build_gemini_endpoint(url, model)
+        else:
+            if api_key:
+                headers["Authorization"] = f"Bearer {api_key}"
+            request_json = payload
+            request_url = url
 
         client = self._get_client(provider_name)
         # No per-request timeout for LLM calls (disabled by request)
-        response = await client.post(url, headers=headers, json=payload)
+        response = await client.post(request_url, headers=headers, json=request_json)
         response.raise_for_status()
         raw = response.json()
+
+        if is_gemini:
+            gemini_text = self._extract_gemini_text(raw)
+            if gemini_text:
+                raw = {
+                    "choices": [
+                        {"message": {"role": "assistant", "content": gemini_text}}
+                    ]
+                }
 
         # Try to normalize OpenAI-style chat completion output into the
         # JSON object requested by callers. If we cannot parse a JSON object
@@ -246,6 +290,134 @@ class AIGateway:
             + "': "
             + content[:500]
         )
+
+    @staticmethod
+    def _is_gemini_provider(name: str) -> bool:
+        return isinstance(name, str) and name in GEMINI_PROVIDER_NAMES
+
+    @staticmethod
+    def _build_gemini_endpoint(base_url: Optional[str], model: Optional[str]) -> str:
+        if not base_url or not isinstance(base_url, str):
+            raise ValueError("Gemini provider requires a base_url")
+        if not model:
+            raise ValueError("Gemini provider requires a model")
+        base = base_url.rstrip("/")
+        if not base:
+            raise ValueError("Gemini provider requires a base_url")
+        if ":generate" in base:
+            return base
+        if base.endswith(model):
+            return base if base.endswith(":generateContent") else f"{base}:generateContent"
+        if base.endswith("/models"):
+            return f"{base}/{model}:generateContent"
+        return f"{base}/{model}:generateContent"
+
+    @staticmethod
+    def _build_gemini_payload(messages: list[Dict[str, Any]], overrides: Dict[str, Any]) -> Dict[str, Any]:
+        contents: list[Dict[str, Any]] = []
+        system_prompts: list[str] = []
+        for msg in messages:
+            if not isinstance(msg, dict):
+                continue
+            text = msg.get("content")
+            if not isinstance(text, str):
+                continue
+            cleaned = text.strip()
+            if not cleaned:
+                continue
+            role = (msg.get("role") or "user").lower()
+            if role == "system":
+                system_prompts.append(cleaned)
+                continue
+            gemini_role = "model" if role == "assistant" else "user"
+            contents.append({"role": gemini_role, "parts": [{"text": cleaned}]})
+
+        if not contents and system_prompts:
+            contents.append({"role": "user", "parts": [{"text": "\n\n".join(system_prompts)}]})
+            system_prompts = []
+
+        if not contents:
+            raise ValueError("Gemini request requires at least one message")
+
+        payload: Dict[str, Any] = {"contents": contents}
+        if system_prompts:
+            payload["system_instruction"] = {
+                "role": "system",
+                "parts": [{"text": "\n\n".join(system_prompts)}],
+            }
+
+        generation_config: Dict[str, Any] = {}
+        temperature = overrides.get("temperature")
+        if isinstance(temperature, (int, float)):
+            generation_config["temperature"] = float(temperature)
+        top_p = overrides.get("top_p")
+        if isinstance(top_p, (int, float)):
+            generation_config["topP"] = float(top_p)
+        max_tokens = overrides.get("max_tokens")
+        if isinstance(max_tokens, (int, float)):
+            generation_config["maxOutputTokens"] = int(max_tokens)
+        stops = overrides.get("stop")
+        if isinstance(stops, str) and stops:
+            generation_config["stopSequences"] = [stops]
+        elif isinstance(stops, list):
+            cleaned_stops = [str(item) for item in stops if isinstance(item, (str, int, float))]
+            if cleaned_stops:
+                generation_config["stopSequences"] = cleaned_stops
+        candidate_count = overrides.get("n")
+        if isinstance(candidate_count, (int, float)) and int(candidate_count) > 0:
+            generation_config["candidateCount"] = int(candidate_count)
+        if generation_config:
+            payload["generationConfig"] = generation_config
+
+        response_format = overrides.get("response_format")
+        if isinstance(response_format, dict):
+            fmt = response_format.get("type")
+            if isinstance(fmt, str) and fmt.lower() == "json_object":
+                payload["responseMimeType"] = "application/json"
+        elif isinstance(response_format, str) and response_format.lower() == "json_object":
+            payload["responseMimeType"] = "application/json"
+
+        return payload
+
+    @staticmethod
+    def _extract_gemini_text(raw: Any) -> Optional[str]:
+        if not isinstance(raw, dict):
+            return None
+
+        candidates = raw.get("candidates")
+        if not isinstance(candidates, list):
+            return None
+
+        def _collect_text(obj: Any) -> list[str]:
+            texts: list[str] = []
+            if isinstance(obj, dict):
+                text_val = obj.get("text")
+                if isinstance(text_val, str):
+                    texts.append(text_val)
+                parts = obj.get("parts")
+                if isinstance(parts, list):
+                    for part in parts:
+                        texts.extend(_collect_text(part))
+            elif isinstance(obj, list):
+                for item in obj:
+                    texts.extend(_collect_text(item))
+            elif isinstance(obj, str):
+                texts.append(obj)
+            return texts
+
+        for cand in candidates:
+            if not isinstance(cand, dict):
+                continue
+            texts = _collect_text(cand.get("content"))
+            # Some responses expose text directly on the candidate
+            direct = cand.get("text")
+            if isinstance(direct, str):
+                texts.append(direct)
+            merged = "\n".join(t.strip() for t in texts if isinstance(t, str) and t.strip())
+            if merged:
+                return merged
+
+        return None
 
     @staticmethod
     def _parse_json_like(text: str) -> Any:
