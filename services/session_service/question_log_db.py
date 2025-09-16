@@ -2,7 +2,8 @@ import json
 import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
+
 
 DB_PATH = Path(__file__).resolve().with_name("question_logs.db")
 
@@ -318,6 +319,170 @@ def log_focus_area_response(
 
     conn.commit()
     conn.close()
+
+
+    if evaluation_type:
+        _update_dimension_averages(cur, session_id, evaluation_type, dimensional_scores)
+    _update_focus_area_average(cur, session_id, focus_area, score)
+
+
+def _parse_detail(detail: Optional[str]) -> Optional[Dict[str, Any]]:
+    if not detail:
+        return None
+    try:
+        return json.loads(detail)
+    except Exception:
+        return None
+
+
+def get_focus_area_averages(
+    session_id: Optional[str], db_path: Path = DB_PATH
+) -> List[Dict[str, Any]]:
+    """Return per-focus-area running averages for a session."""
+
+    if not session_id:
+        return []
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT focus_area, total_score, sample_size, average_score
+        FROM focus_area_averages
+        WHERE session_id = ?
+        ORDER BY average_score DESC, focus_area ASC
+        """,
+        (session_id,),
+    )
+    rows = cur.fetchall()
+    conn.close()
+    return [
+        {
+            "focus_area": row[0],
+            "total_score": row[1] or 0.0,
+            "sample_size": row[2] or 0,
+            "average_score": row[3] or 0.0,
+        }
+        for row in rows
+    ]
+
+
+def get_dimension_averages(
+    session_id: Optional[str], db_path: Path = DB_PATH
+) -> Dict[str, List[Dict[str, Any]]]:
+    """Return rubric-dimension averages grouped by evaluation type."""
+
+    if not session_id:
+        return {}
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT evaluation_type, dimension_name, average_score, sample_size
+        FROM dimension_averages
+        WHERE session_id = ?
+        ORDER BY evaluation_type ASC, dimension_name ASC
+        """,
+        (session_id,),
+    )
+    rows = cur.fetchall()
+    conn.close()
+    grouped: Dict[str, List[Dict[str, Any]]] = {}
+    for etype, dimension, avg, count in rows:
+        if not etype:
+            continue
+        grouped.setdefault(str(etype), []).append(
+            {
+                "dimension": str(dimension),
+                "average_score": avg or 0.0,
+                "sample_size": int(count or 0),
+            }
+        )
+    return grouped
+
+
+def get_session_identifiers(
+    session_id: Optional[str], db_path: Path = DB_PATH
+) -> Dict[str, Optional[str]]:
+    """Fetch candidate/job identifiers stored alongside question logs."""
+
+    result = {"candidate_id": None, "job_id": None, "resume_id": None}
+    if not session_id:
+        return result
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    try:
+        for table in ("focus_area_logs", "question_logs"):
+            cur.execute(
+                f"""
+                SELECT candidate_id, job_id, resume_id
+                FROM {table}
+                WHERE session_id = ?
+                ORDER BY id DESC
+                LIMIT 5
+                """,
+                (session_id,),
+            )
+            for cand, job, resume in cur.fetchall():
+                if result["candidate_id"] in (None, "") and cand not in (None, ""):
+                    result["candidate_id"] = str(cand)
+                if result["job_id"] in (None, "") and job not in (None, ""):
+                    result["job_id"] = str(job)
+                if result["resume_id"] in (None, "") and resume not in (None, ""):
+                    result["resume_id"] = str(resume)
+                if all(result.values()):
+                    break
+            if all(result.values()):
+                break
+    finally:
+        conn.close()
+    return result
+
+
+def get_session_question_logs(
+    session_id: Optional[str], db_path: Path = DB_PATH
+) -> List[Dict[str, Any]]:
+    """Return ordered question/answer entries (with evaluations if available)."""
+
+    if not session_id:
+        return []
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT
+            stage,
+            question_type,
+            question_text,
+            answer_text,
+            evaluation_type,
+            evaluation_detail,
+            evaluation_score,
+            timestamp
+        FROM question_logs
+        WHERE session_id = ?
+        ORDER BY id ASC
+        """,
+        (session_id,),
+    )
+    rows = cur.fetchall()
+    ]
+    conn.close()
+    result: List[Dict[str, Any]] = []
+    for row in rows:
+        eval_payload = _parse_detail(row[5])
+        result.append(
+            {
+                "stage": row[0],
+                "question_type": row[1],
+                "question_text": row[2],
+                "answer_text": row[3],
+                "evaluation_type": row[4],
+                "evaluation_score": row[6],
+                "evaluation_payload": eval_payload,
+                "timestamp": row[7],
+            }
+        )
+    return result
 
 
 # Ensure the database exists on import

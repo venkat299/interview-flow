@@ -7,6 +7,10 @@ from session_service.question_log_db import (
     init_db,
     log_question_response,
     log_focus_area_response,
+    get_focus_area_averages,
+    get_dimension_averages,
+    get_session_identifiers,
+    get_session_question_logs,
 )
 
 
@@ -63,6 +67,14 @@ def test_log_question_response_captures_question_and_answer(tmp_path):
     stored_detail = json.loads(row[7])
     assert pytest.approx(stored_detail["overall_score"], rel=1e-6) == 4.25
     assert pytest.approx(row[8], rel=1e-6) == 4.25
+
+
+    logs = get_session_question_logs("s1", db_path=db_path)
+    assert logs[0]["evaluation_type"] == "Reasoning"
+    assert pytest.approx(logs[0]["evaluation_payload"]["overall_score"], rel=1e-6) == 4.25
+
+    identifiers = get_session_identifiers("s1", db_path=db_path)
+    assert identifiers["candidate_id"] == "c1"
 
 
 def test_focus_area_logs_store_evaluations_and_averages(tmp_path):
@@ -164,3 +176,13 @@ def test_focus_area_logs_store_evaluations_and_averages(tmp_path):
         1,
     )
     conn.close()
+
+    fa_averages = get_focus_area_averages("s1", db_path=db_path)
+    assert fa_averages[0]["focus_area"] == "Python Mastery"
+    assert fa_averages[0]["sample_size"] == 2
+    assert pytest.approx(fa_averages[0]["average_score"], rel=1e-6) == 3.5
+
+    dim_summary = get_dimension_averages("s1", db_path=db_path)
+    assert "Reasoning" in dim_summary and "Conceptual" in dim_summary
+    assert any(item["dimension"] == "problem_comprehension" for item in dim_summary["Reasoning"])
+
