@@ -3,14 +3,10 @@ from __future__ import annotations
 
 from langgraph.graph import StateGraph, START, END
 
-from .schemas import ContextPacket, VerificationResult
+from .schemas import ContextPacket
 from .programs.stage0_analysis import Stage0AnalysisProgram, JDResumeAnalysisInput
-from .programs.stage3_theory import (
-    TheoryQuestionProgram,
-    TheoryQuestionInput,
-    TheoryEvalProgram,
-    TheoryEvalInput,
-)
+from .programs.stage1_intro import Stage1IntroProgram, IntroModuleInput
+from .programs.stage2_qa import Stage2QAProgram, Stage2QAInput
 from .programs.stage4_wrapup import WrapUpProgram, WrapUpInput
 
 
@@ -26,26 +22,22 @@ async def stage0_analysis_node(state: InterviewState) -> dict:
     return output.model_dump()
 
 
-async def stage3_theory_node(state: InterviewState) -> dict:
-    """Run a theory check on each collected skill in sequence."""
-    skills = state.followup_hooks or state.skill_hooks or state.jd_core_skills
-    if not skills:
-        return {}
+async def stage1_intro_node(state: InterviewState) -> dict:
+    """Generate a greeting and capture it for reference."""
 
-    idx = len(state.verifications)
-    if idx >= len(skills):
-        return {}
+    program = Stage1IntroProgram()
+    output = await program(IntroModuleInput(role=state.role_from_jd))
+    return {"notes": state.notes + [output.question_text]}
 
-    skill = skills[idx]
-    question = await TheoryQuestionProgram()(TheoryQuestionInput(skill=skill))
-    eval_result = await TheoryEvalProgram()(TheoryEvalInput(answer=""))
-    verification = VerificationResult(
-        skill=skill, result=eval_result.result, rationale=eval_result.rationale
+
+async def stage2_focus_plan_node(state: InterviewState) -> dict:
+    """Request focus areas and questions for the QA stage."""
+
+    program = Stage2QAProgram()
+    output = await program(
+        Stage2QAInput(jd_text=state.jd_text, resume_text=state.resume_text)
     )
-    return {
-        "verifications": state.verifications + [verification],
-        "notes": state.notes + [question.question_text],
-    }
+    return {"focus_areas": output.interview_focus_areas}
 
 
 async def stage4_wrapup_node(state: InterviewState) -> dict:
@@ -58,21 +50,14 @@ def build_interview_graph() -> StateGraph:
     """Create a sequential LangGraph covering all interview stages."""
     graph = StateGraph(InterviewState)
     graph.add_node("stage0_analysis", stage0_analysis_node)
-    graph.add_node("stage3_theory", stage3_theory_node)
+    graph.add_node("stage1_intro", stage1_intro_node)
+    graph.add_node("stage2_focus_plan", stage2_focus_plan_node)
     graph.add_node("stage4_wrapup", stage4_wrapup_node)
 
     graph.add_edge(START, "stage0_analysis")
-    graph.add_edge("stage0_analysis", "stage3_theory")
-
-    def _more_theory(state: InterviewState) -> str:
-        skills = state.followup_hooks or state.skill_hooks or state.jd_core_skills
-        return "again" if len(state.verifications) < len(skills) else "done"
-
-    graph.add_conditional_edges(
-        "stage3_theory",
-        _more_theory,
-        {"again": "stage3_theory", "done": "stage4_wrapup"},
-    )
+    graph.add_edge("stage0_analysis", "stage1_intro")
+    graph.add_edge("stage1_intro", "stage2_focus_plan")
+    graph.add_edge("stage2_focus_plan", "stage4_wrapup")
 
     graph.add_edge("stage4_wrapup", END)
 

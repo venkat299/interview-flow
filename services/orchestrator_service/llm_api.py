@@ -1,7 +1,6 @@
 """Core AI interview utilities."""
 
-from typing import Optional
-from types import SimpleNamespace
+from typing import List, Optional
 
 from .schemas import (
     InterviewRequest,
@@ -10,7 +9,8 @@ from .schemas import (
     EvaluationRequest,
     EvaluationResponse,
     ContextPacket,
-    VerificationResult,
+    FocusAreaQuestions,
+    FocusAreaExchange,
 )
 from gateway_service import gateway
 from common.skill_inventory import SKILL_INVENTORY
@@ -22,12 +22,8 @@ from .programs.stage0_analysis import (
     Stage0AnalysisProgram,
     JDResumeAnalysisInput,
 )
-from .programs.stage3_theory import (
-    TheoryQuestionProgram,
-    TheoryQuestionInput,
-    TheoryEvalProgram,
-    TheoryEvalInput,
-)
+from .programs.stage1_intro import Stage1IntroProgram, IntroModuleInput
+from .programs.stage2_qa import Stage2QAProgram, Stage2QAInput
 from .programs.stage4_wrapup import (
     WrapUpProgram,
     WrapUpInput,
@@ -194,18 +190,10 @@ _interviewer = LLMInterviewer()
 _monitor = LLMMonitor()
 _scoring = ScoringEngine()
 _stage0 = Stage0AnalysisProgram()
-_theory_question = TheoryQuestionProgram()
-_theory_eval = TheoryEvalProgram()
+_intro = Stage1IntroProgram()
+_qa_plan = Stage2QAProgram()
 _wrap_up = WrapUpProgram()
 _graph = build_interview_graph()
-
-
-async def _safe_theory_eval(answer: str):
-    """Evaluate an answer, treating malformed JSON as a failure."""
-    try:
-        return await _theory_eval(TheoryEvalInput(answer=answer))
-    except ValueError as exc:
-        return SimpleNamespace(result="fail", rationale=str(exc))
 
 
 def _decrement_time(packet: ContextPacket, minutes: int) -> None:
@@ -213,6 +201,88 @@ def _decrement_time(packet: ContextPacket, minutes: int) -> None:
 
     remaining = packet.time_remaining_min or packet.duration_min
     packet.time_remaining_min = max(remaining - minutes, 0)
+
+
+async def intro_greeting(packet: ContextPacket) -> dict:
+    """Generate the introductory greeting and decrement available time."""
+
+    output = await _intro(IntroModuleInput(role=packet.role_from_jd))
+    _decrement_time(packet, 1)
+    return {"question_text": output.question_text, "question_type": "intro_greeting"}
+
+
+def record_intro_answer(packet: ContextPacket, answer: str) -> None:
+    """Append the candidate's introduction to session notes."""
+
+    if answer:
+        packet.notes.append(f"Candidate introduction: {answer}")
+
+
+async def ensure_focus_area_plan(packet: ContextPacket) -> List[FocusAreaQuestions]:
+    """Fetch or reuse the generated focus areas for the QA module."""
+
+    if packet.focus_areas:
+        return packet.focus_areas
+
+    output = await _qa_plan(
+        Stage2QAInput(jd_text=packet.jd_text, resume_text=packet.resume_text)
+    )
+
+    cleaned: List[FocusAreaQuestions] = []
+    for area in output.interview_focus_areas:
+        name = (area.area_name or "").strip()
+        if not name:
+            continue
+        reasoning = [q.strip() for q in list(area.reasoning_questions or []) if q and q.strip()]
+        conceptual = [
+            q.strip() for q in list(area.conceptual_questions or []) if q and q.strip()
+        ]
+        cleaned.append(
+            FocusAreaQuestions(
+                area_name=name,
+                reasoning_questions=reasoning[:2],
+                conceptual_questions=conceptual[:2],
+            )
+        )
+
+    packet.focus_areas = cleaned
+    return packet.focus_areas
+
+
+def build_focus_area_question(
+    packet: ContextPacket,
+    focus_area: str,
+    question_category: str,
+    question_text: str,
+) -> dict:
+    """Create the payload for a QA question while consuming interview time."""
+
+    normalized_type = f"qa_{question_category}"
+    _decrement_time(packet, 1)
+    return {
+        "question_text": question_text,
+        "question_type": normalized_type,
+        "focus_area": focus_area,
+    }
+
+
+def record_focus_area_answer(
+    packet: ContextPacket,
+    focus_area: str,
+    question_type: str,
+    question_text: str,
+    answer: str,
+) -> None:
+    """Persist a QA turn on the context packet for later evaluation."""
+
+    packet.focus_area_history.append(
+        FocusAreaExchange(
+            area_name=focus_area,
+            question_type=question_type,
+            question_text=question_text,
+            answer_text=answer,
+        )
+    )
 
 
 
@@ -261,76 +331,30 @@ async def analyze_jd_resume(
 
 
 
-async def theory_primary_question(
-    packet: ContextPacket, skill: str, answer: Optional[str] = None
-) -> Optional[dict]:
-    """Stage-3 step: ask a primary theory question for a skill."""
-
-    if answer is None:
-        q_out = await _theory_question(TheoryQuestionInput(skill=skill))
-        _decrement_time(packet, 1)
-        return {"question_text": q_out.question_text, "question_type": "theory_primary"}
-
-    e_out = await _safe_theory_eval(answer)
-    packet.verifications.append(
-        VerificationResult(skill=skill, result=e_out.result, rationale=e_out.rationale)
-    )
-    return None
-
-
-async def theory_followup_question(
-    packet: ContextPacket, skill: str, answer: Optional[str] = None
-) -> Optional[dict]:
-    """Stage-3 step: follow-up question on the same skill.
-
-    The difficulty of the follow-up is based on the prior verification result.
-    """
-
-    if answer is None:
-        last = next(
-            (v for v in reversed(packet.verifications) if v.skill == skill),
-            None,
-        )
-        if last and last.result == "pass":
-            system_prompt = (
-                f"You are verifying advanced understanding of '{skill}'. "
-                "Ask a harder follow-up question. Respond with JSON {\"question_text\": string}."
-            )
-        else:
-            rationale = last.rationale if last else ""
-            system_prompt = (
-                f"You are verifying understanding of '{skill}'. The candidate's previous answer was incorrect. "
-                f"Reference: {rationale}. Ask a follow-up question to address the misunderstanding. "
-                "Respond with JSON {\"question_text\": string}."
-            )
-        data = await gateway.execute_task(
-            task_name="stage_3_question",
-            system_prompt=system_prompt,
-        )
-        _decrement_time(packet, 1)
-        return {"question_text": data["question_text"], "question_type": "theory_followup"}
-
-    e_out = await _safe_theory_eval(answer)
-    if packet.verifications:
-        packet.verifications[-1].followup_result = e_out.result
-        packet.verifications[-1].followup_rationale = e_out.rationale
-    return None
-
-
-
 async def wrapup_feedback(
     packet: ContextPacket, answer: Optional[str] = None
 ) -> Optional[dict]:
     """Stage-4 step: gather feedback and finalize summary."""
 
     if answer is None:
+        notes = "; ".join(packet.notes)
+        focus_summaries = "; ".join(
+            f"{ex.area_name}: {ex.question_text}" for ex in packet.focus_area_history[-2:]
+        )
         system_prompt = (
-            "You are an AI technical interviewer concluding the interview. Ask the candidate for brief feedback on this interview experience. "
-            "Respond ONLY with a single, valid JSON object with a single key 'question_text'."
+            "You are an AI technical interviewer concluding a session. Compose a single closing question that does ALL of the following: "
+            "(1) thanks the candidate for their time, (2) offers a warm compliment grounded in the strongest positive signal from the interview notes, and "
+            '(3) invites them to share quick feedback about their interview experience. Respond ONLY with JSON {"question_text": "..."}.'
+        )
+        user_prompt = (
+            "Interview notes for context: "
+            f"{notes if notes else 'No prior notes recorded.'}\n"
+            f"Recent focus area highlights: {focus_summaries or 'None available.'}"
         )
         data = await gateway.execute_task(
             task_name="question_generation",
             system_prompt=system_prompt,
+            user_prompt=user_prompt,
         )
         _decrement_time(packet, 1)
         return {"question_text": data["question_text"], "question_type": "wrapup_feedback"}
@@ -345,23 +369,6 @@ async def wrapup_feedback(
         packet.notes.append("Follow-ups: " + ", ".join(out.follow_ups))
     packet.time_remaining_min = 0
     return None
-
-
-async def wrapup_closing(packet: ContextPacket) -> dict:
-    """Stage-4 step: deliver a brief thank-you closing message."""
-
-    notes = "; ".join(packet.notes)
-    system_prompt = (
-        "You are an AI technical interviewer concluding the interview. "
-        "Craft a short thank-you message summarizing the session using these notes. "
-        "Respond ONLY with a single, valid JSON object with a single key 'question_text'."
-        f" Notes: {notes}."
-    )
-    data = await gateway.execute_task(
-        task_name="question_generation",
-        system_prompt=system_prompt,
-    )
-    return {"question_text": data["question_text"], "question_type": "wrapup_closing"}
 
 
 async def run_interview(packet: ContextPacket) -> ContextPacket:

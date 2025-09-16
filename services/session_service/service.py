@@ -63,10 +63,18 @@ class ConnectionManager:
             )
             session_id = self.session_ids.get(websocket)
             candidate_id = payload.get("candidate_id")
+            job_id = payload.get("job_id")
+            resume_id = payload.get("resume_id")
+            job_id_str = str(job_id) if job_id not in (None, "") else None
+            resume_id_str = (
+                str(resume_id) if resume_id not in (None, "") else None
+            )
             state = InterviewState(
                 packet,
                 session_id=session_id,
                 candidate_id=candidate_id,
+                job_id=job_id_str,
+                resume_id=resume_id_str,
             )
             self.states[websocket] = state
             self.history[websocket] = []
@@ -137,14 +145,17 @@ class ConnectionManager:
                         )
                 except Exception:
                     pass
+                payload = {
+                    "question_text": question,
+                    "stage": state.current_phase,
+                    "question_type": qtype,
+                }
+                if "focus_area" in q_payload:
+                    payload["focus_area"] = q_payload["focus_area"]
                 await websocket.send_json(
                     {
                         "event": "new_question",
-                        "payload": {
-                            "question_text": question,
-                            "stage": state.current_phase,
-                            "question_type": qtype,
-                        },
+                        "payload": payload,
                     }
                 )
             return
@@ -215,13 +226,16 @@ class ConnectionManager:
                     )
             except Exception:
                 pass
+            payload = {
+                "question_text": question,
+                "stage": state.current_phase,
+                "question_type": qtype,
+            }
+            if "focus_area" in q_payload:
+                payload["focus_area"] = q_payload["focus_area"]
             await websocket.send_json(
                 {
                     "event": "new_question",
-                    "payload": {
-                        "question_text": question,
-                        "stage": state.current_phase,
-                        "question_type": qtype,
-                    },
+                    "payload": payload,
                 }
             )
