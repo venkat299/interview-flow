@@ -15,13 +15,28 @@ def test_log_question_response_captures_question_and_answer(tmp_path):
         question_text="What is Python?",
         answer_text="A language",
         session_id="s1",
+        job_id="job-42",
+        resume_id="resume-99",
         candidate_id="c1",
+        evaluation_detail="Strong fundamentals",
+        evaluation_score=8.5,
         db_path=db_path,
     )
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
     cur.execute(
-        "SELECT stage, question_type, question_text, answer_text FROM question_logs"
+        """
+        SELECT
+            stage,
+            question_type,
+            question_text,
+            answer_text,
+            job_id,
+            resume_id,
+            evaluation_detail,
+            evaluation_score
+        FROM question_logs
+        """
     )
     row = cur.fetchone()
     conn.close()

@@ -8,8 +8,8 @@ from .llm_api import (
     ensure_focus_area_plan,
     build_focus_area_question,
     record_focus_area_answer,
-    theory_primary_question,
-    theory_followup_question,
+    # theory_primary_question,
+    # theory_followup_question,
     wrapup_feedback,
 )
 from .followups import build_followup_question, update_followup_hooks
@@ -24,6 +24,10 @@ class Orchestrator:
     ) -> Optional[dict]:
         packet = state.packet
         phase = state.current_phase
+        session_id = getattr(state, "session_id", None)
+        candidate_id = getattr(state, "candidate_id", None)
+        job_id = getattr(state, "job_id", None)
+        resume_id = getattr(state, "resume_id", None)
 
         # Handle answer to a targeted follow-up probe
         if answer is not None and getattr(state, "last_question_type", None) == "targeted_followup":
@@ -32,8 +36,10 @@ class Orchestrator:
                 question_type="targeted_followup",
                 question_text=getattr(state, "last_question_text", ""),
                 answer_text=answer,
-                session_id=getattr(state, "session_id", None),
-                candidate_id=getattr(state, "candidate_id", None),
+                session_id=session_id,
+                job_id=job_id,
+                resume_id=resume_id,
+                candidate_id=candidate_id,
             )
 
             update_followup_hooks(packet, answer, addressed_hook=state.last_followup_hook)
@@ -140,8 +146,10 @@ class Orchestrator:
                     question_type=getattr(state, "last_question_type", ""),
                     question_text=getattr(state, "last_question_text", ""),
                     answer_text=answer,
-                    session_id=getattr(state, "session_id", None),
-                    candidate_id=getattr(state, "candidate_id", None),
+                    session_id=session_id,
+                    job_id=job_id,
+                    resume_id=resume_id,
+                    candidate_id=candidate_id,
                 )
                 record_intro_answer(packet, answer)
                 state.last_question_text = None
@@ -165,8 +173,10 @@ class Orchestrator:
                     question_type=getattr(state, "last_question_type", ""),
                     question_text=getattr(state, "last_question_text", ""),
                     answer_text=answer,
-                    session_id=getattr(state, "session_id", None),
-                    candidate_id=getattr(state, "candidate_id", None),
+                    session_id=session_id,
+                    job_id=job_id,
+                    resume_id=resume_id,
+                    candidate_id=candidate_id,
                 )
                 if getattr(state, "last_focus_area", None):
                     log_focus_area_response(
@@ -174,8 +184,10 @@ class Orchestrator:
                         question_type=getattr(state, "last_question_type", ""),
                         question_text=getattr(state, "last_question_text", ""),
                         answer_text=answer,
-                        session_id=getattr(state, "session_id", None),
-                        candidate_id=getattr(state, "candidate_id", None),
+                        session_id=session_id,
+                        job_id=job_id,
+                        resume_id=resume_id,
+                        candidate_id=candidate_id,
                     )
                     record_focus_area_answer(
                         packet,
@@ -208,6 +220,7 @@ class Orchestrator:
             state.last_focus_area = q_payload.get("focus_area")
             return q_payload
 
+
         if phase == "wrap_up":
             if state.wrapup_index >= len(state.wrapup_steps):
                 state.advance_phase()
@@ -219,8 +232,10 @@ class Orchestrator:
                     question_type=getattr(state, "last_question_type", ""),
                     question_text=getattr(state, "last_question_text", ""),
                     answer_text=answer,
-                    session_id=getattr(state, "session_id", None),
-                    candidate_id=getattr(state, "candidate_id", None),
+                    session_id=session_id,
+                    job_id=job_id,
+                    resume_id=resume_id,
+                    candidate_id=candidate_id,
                 )
                 state.last_question_text = None
                 state.last_question_type = None

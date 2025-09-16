@@ -22,6 +22,8 @@ class InterviewState:
         packet: ContextPacket,
         session_id: Optional[str] = None,
         candidate_id: Optional[str] = None,
+        job_id: Optional[str] = None,
+        resume_id: Optional[str] = None,
     ) -> None:
         self.packet = packet
         self.phase_index = 0
@@ -32,6 +34,8 @@ class InterviewState:
         # Metadata for logging
         self.session_id = session_id
         self.candidate_id = candidate_id
+        self.job_id = job_id
+        self.resume_id = resume_id
         # Track the last question asked to pair with the next answer
         self.last_question_text: Optional[str] = None
         self.last_question_type: Optional[str] = None
