@@ -22,7 +22,6 @@ from google.genai.types import GenerateContentConfig
 
 from .config import settings
 
-
 class AIGateway:
     """Singleton gateway managing HTTP clients for LLM providers."""
 
@@ -65,6 +64,7 @@ class AIGateway:
                 "api_key": settings.gemini_api_key or None,
                 "model": settings.gemini_model,
             }
+
         if name in {"auto_answer", "auto-answer", "autoanswer"}:
             return {
                 "base_url": settings.auto_llm_url or settings.local_llm_url,
@@ -372,6 +372,7 @@ class AIGateway:
         payload: Dict[str, Any] = {"model": model, "messages": messages}
         for key, value in option_overrides.items():
             payload[key] = value
+
 
         headers: Dict[str, str] = {}
         if api_key:

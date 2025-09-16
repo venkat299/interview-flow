@@ -30,6 +30,7 @@ providers:
     response_format:
       type: json_object
 
+
   # Optional: keep OpenAI config for fallback/manual switching
   # openai:
   #   base_url: https://api.openai.com/v1/chat/completions
@@ -44,7 +45,7 @@ tasks:
   answer_evaluation:
     provider: local
   auto_answer_generation:
-    provider: gemini
+    provider: local
   # Heavier tasks used by the app-test endpoints
   fake_candidate_profile:
     provider: local
