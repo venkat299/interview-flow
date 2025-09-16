@@ -24,6 +24,20 @@ def init_db(db_path: Path = DB_PATH) -> None:
         )
         """
     )
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS focus_area_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT,
+            candidate_id TEXT,
+            focus_area TEXT,
+            question_type TEXT,
+            question_text TEXT,
+            answer_text TEXT,
+            timestamp TEXT
+        )
+        """
+    )
     conn.commit()
     conn.close()
 
@@ -50,6 +64,39 @@ def log_question_response(
             session_id,
             candidate_id,
             stage,
+            question_type,
+            question_text,
+            answer_text,
+            datetime.now(UTC).isoformat(),
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+
+def log_focus_area_response(
+    focus_area: str,
+    question_type: str,
+    question_text: str,
+    answer_text: str,
+    session_id: Optional[str] = None,
+    candidate_id: Optional[str] = None,
+    db_path: Path = DB_PATH,
+) -> None:
+    """Persist focus area question/answer data for later evaluation."""
+
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO focus_area_logs (
+            session_id, candidate_id, focus_area, question_type, question_text, answer_text, timestamp
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            session_id,
+            candidate_id,
+            focus_area,
             question_type,
             question_text,
             answer_text,
