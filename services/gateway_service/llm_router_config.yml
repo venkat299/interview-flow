@@ -27,7 +27,7 @@ providers:
   auto_answer:
     base_url: https://6311e26c90cd.ngrok-free.app/v1/chat/completions
     api_key: ""
-    model: openai/gpt-oss-20b
+    model: dpo-qwen2-1.5b-instruct-human-like
     temperature: 0.8
 
   # Optional: keep OpenAI config for fallback/manual switching
