@@ -125,6 +125,55 @@ async def test_evaluate_candidate_answer(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_reasoning_evaluation_prompt(monkeypatch):
+    async def fake_execute(task_name, system_prompt, user_prompt=None):
+        assert task_name == "reasoning_evaluation"
+        assert "QUESTION:" in system_prompt
+        assert "RESUME_CONTEXT" in system_prompt
+        return {
+            "evaluation_type": "Reasoning",
+            "overall_score": "4.5",
+            "dimensional_scores": {
+                "problem_comprehension": {
+                    "score": "5",
+                    "justification": "Clear"
+                }
+            },
+        }
+
+    monkeypatch.setattr(ai.gateway, "execute_task", fake_execute)
+
+    result = await ai.evaluate_reasoning_response(
+        question="Explain scaling", resume_context="Built services", answer="Used autoscaling"
+    )
+    assert result["evaluation_type"] == "Reasoning"
+    assert result["overall_score"] == 4.5
+    assert result["dimensional_scores"]["problem_comprehension"]["score"] == 5.0
+
+
+@pytest.mark.asyncio
+async def test_conceptual_evaluation_prompt(monkeypatch):
+    async def fake_execute(task_name, system_prompt, user_prompt=None):
+        assert task_name == "conceptual_evaluation"
+        assert "QUESTION:" in system_prompt
+        return {
+            "overall_score": 3,
+            "dimensional_scores": {
+                "factual_accuracy": {"score": 3, "justification": "OK"}
+            },
+        }
+
+    monkeypatch.setattr(ai.gateway, "execute_task", fake_execute)
+
+    result = await ai.evaluate_conceptual_response(
+        question="What is a DAG?", answer="Directed acyclic graph"
+    )
+    assert result["evaluation_type"] == "Conceptual"
+    assert result["overall_score"] == 3.0
+    assert result["dimensional_scores"]["factual_accuracy"]["score"] == 3.0
+
+
+@pytest.mark.asyncio
 async def test_generate_introductory_question(monkeypatch):
     async def fake_execute(task_name, system_prompt, user_prompt=None):
         assert task_name == "question_generation"
