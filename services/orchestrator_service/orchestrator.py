@@ -8,8 +8,8 @@ from .llm_api import (
     ensure_focus_area_plan,
     build_focus_area_question,
     record_focus_area_answer,
-    theory_primary_question,
-    theory_followup_question,
+    # theory_primary_question,
+    # theory_followup_question,
     wrapup_feedback,
 )
 from .followups import build_followup_question, update_followup_hooks
