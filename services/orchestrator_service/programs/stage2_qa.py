@@ -11,6 +11,7 @@ from gateway_service import gateway
 from ..schemas import FocusAreaQuestions
 
 
+
 PROMPT_TEMPLATE = Template(
     """You are an expert AI technical recruiter. Your task is to analyze the provided Job Description (JD) and Resume to create a structured and cohesive interview question guide.
 
@@ -32,7 +33,9 @@ Follow these instructions precisely:
 
         - Simplicity: All questions must be non-compound. Do not ask two things in one question.
 
-        - Contextual Framing: Frame your questions with context from the candidate's resume to make them more specific and conversational. For example, instead of asking "What is your reasoning for choosing a batch design?", ask "Your Automated Forecasting Pipeline project is a strong example of an end-to-end system. Could you walk me through your reasoning for choosing a batch design on GCP?"
+        - Contextual & Probing Framing: Frame your questions to be specific, conversational, and to encourage the candidate to substantiate their experience.
+            - **Provide context from the resume.** For example, instead of asking "Why did you choose a batch design?", ask "Your Automated Forecasting Pipeline project is a strong example of an end-to-end system. Could you walk me through your reasoning for choosing a batch design on GCP?"
+            - **Phrase questions probingly, not as confirmations.** Instead of stating "You led a data quality initiative...", frame it as a point of discussion, such as "Your resume states you led a data quality initiative at ICICI Bank. Can you describe the thought process behind that?"
 
     5. Format Output as JSON: The final output must be a single, well-formed JSON object. Use the following structure:
 
