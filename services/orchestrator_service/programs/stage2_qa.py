@@ -1,7 +1,6 @@
 """DSPy program for Stage-2 focus area interview planning."""
 from __future__ import annotations
 
-from string import Template
 from typing import List
 
 import dspy
@@ -11,8 +10,7 @@ from gateway_service import gateway
 from ..schemas import FocusAreaQuestions
 
 
-PROMPT_TEMPLATE = Template(
-    """You are an expert AI technical recruiter. Your task is to analyze the provided Job Description (JD) and Resume to create a structured interview question guide.
+PROMPT_PREAMBLE = """You are an expert AI technical recruiter. Your task is to analyze the provided Job Description (JD) and Resume to create a structured interview question guide.
 
 Follow these instructions precisely:
 
@@ -64,14 +62,9 @@ Follow these instructions precisely:
 }
 
 [INSERT JOB DESCRIPTION HERE]
-
-$job_description
-
-[INSERT RESUME HERE]
-
-$resume
 """
-)
+
+PROMPT_RESUME_HEADER = "[INSERT RESUME HERE]"
 
 
 class Stage2QAInput(BaseModel):
@@ -91,9 +84,9 @@ class Stage2QAProgram(dspy.Module):
     """Request a focus-area driven interview plan from a dedicated LLM."""
 
     async def __call__(self, inp: Stage2QAInput) -> Stage2QAOutput:
-        prompt = PROMPT_TEMPLATE.substitute(
-            job_description=inp.jd_text or "Not provided",
-            resume=inp.resume_text or "Not provided",
+        prompt = (
+            f"{PROMPT_PREAMBLE}\n\n{inp.jd_text or 'Not provided'}"
+            f"\n\n{PROMPT_RESUME_HEADER}\n\n{inp.resume_text or 'Not provided'}"
         )
         data = await gateway.execute_task(
             task_name="stage_2_focus_plan",
