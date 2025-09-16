@@ -30,11 +30,6 @@ providers:
     model: dpo-qwen2-1.5b-instruct-human-like
     temperature: 0.8
 
-  # Google AI Studio Gemini provider (uses generateContent endpoint)
-  gemini:
-    base_url: https://generativelanguage.googleapis.com/v1/models
-    model: gemini-2.5-flash
-
   # Optional: keep OpenAI config for fallback/manual switching
   # openai:
   #   base_url: https://api.openai.com/v1/chat/completions
@@ -49,7 +44,7 @@ tasks:
   answer_evaluation:
     provider: local
   auto_answer_generation:
-    provider: gemini
+    provider: local
   # Heavier tasks used by the app-test endpoints
   fake_candidate_profile:
     provider: local

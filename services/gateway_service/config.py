@@ -56,12 +56,6 @@ class Settings:
     # Model identifier for local OpenAI-compatible servers
     # Prefer llm_router_config.yml, allow env override
     local_model: str = os.getenv("LOCAL_LLM_MODEL", _LOCAL_MODEL_YAML)
-    gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
-    gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
-    gemini_api_url: str = os.getenv(
-        "GEMINI_API_URL",
-        "https://generativelanguage.googleapis.com/v1/models",
-    )
     # Local OpenAI-compatible server URL; prefer llm_router_config.yml, allow env override
     local_llm_url: str = os.getenv("LOCAL_LLM_URL", _LOCAL_BASE_URL_YAML)
     # Dedicated provider configuration for the auto-answer generator
