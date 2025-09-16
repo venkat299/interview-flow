@@ -68,7 +68,6 @@ def test_log_question_response_captures_question_and_answer(tmp_path):
     assert pytest.approx(stored_detail["overall_score"], rel=1e-6) == 4.25
     assert pytest.approx(row[8], rel=1e-6) == 4.25
 
-
     logs = get_session_question_logs("s1", db_path=db_path)
     assert logs[0]["evaluation_type"] == "Reasoning"
     assert pytest.approx(logs[0]["evaluation_payload"]["overall_score"], rel=1e-6) == 4.25
@@ -104,6 +103,7 @@ def test_focus_area_logs_store_evaluations_and_averages(tmp_path):
         session_id="s1",
         job_id="job-42",
         resume_id="resume-99",
+
         candidate_id="c1",
         evaluation=reasoning_eval,
         db_path=db_path,
@@ -129,6 +129,7 @@ def test_focus_area_logs_store_evaluations_and_averages(tmp_path):
         FROM focus_area_logs
         ORDER BY id
         """
+
     )
     rows = cur.fetchall()
     assert rows[0] == ("Python Mastery", "qa_reasoning", "Reasoning", pytest.approx(4.0))
@@ -185,4 +186,58 @@ def test_focus_area_logs_store_evaluations_and_averages(tmp_path):
     dim_summary = get_dimension_averages("s1", db_path=db_path)
     assert "Reasoning" in dim_summary and "Conceptual" in dim_summary
     assert any(item["dimension"] == "problem_comprehension" for item in dim_summary["Reasoning"])
+
+
+def test_init_db_backfills_identifier_columns(tmp_path):
+    """Existing installs should pick up new identifier columns automatically."""
+
+    db_path = tmp_path / "question_logs.db"
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute(
+        """
+        CREATE TABLE question_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT,
+            stage TEXT,
+            question_type TEXT,
+            question_text TEXT,
+            answer_text TEXT,
+            timestamp TEXT
+        )
+        """
+    )
+    cur.execute(
+        """
+        CREATE TABLE focus_area_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT,
+            focus_area TEXT,
+            question_type TEXT,
+            question_text TEXT,
+            answer_text TEXT,
+            timestamp TEXT
+        )
+        """
+    )
+    conn.commit()
+    conn.close()
+
+    init_db(db_path)
+
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("PRAGMA table_info(question_logs)")
+    question_cols = {row[1] for row in cur.fetchall()}
+    cur.execute("PRAGMA table_info(focus_area_logs)")
+    focus_cols = {row[1] for row in cur.fetchall()}
+    conn.close()
+
+    identifier_columns = {"job_id", "resume_id", "candidate_id"}
+    evaluation_columns = {"evaluation_type", "evaluation_detail", "evaluation_score"}
+
+    assert identifier_columns.issubset(question_cols)
+    assert evaluation_columns.issubset(question_cols)
+    assert identifier_columns.issubset(focus_cols)
+    assert evaluation_columns.issubset(focus_cols)
 

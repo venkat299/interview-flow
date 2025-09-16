@@ -53,6 +53,12 @@ class AIGateway:
                 "api_key": settings.openai_api_key or None,
                 "model": settings.openai_model,
             }
+        if name in {"auto_answer", "auto-answer", "autoanswer"}:
+            return {
+                "base_url": settings.auto_llm_url or settings.local_llm_url,
+                "api_key": settings.auto_llm_api_key or None,
+                "model": settings.auto_llm_model or settings.local_model,
+            }
         # Default to local OpenAI-compatible endpoint
         return {
             "base_url": settings.local_llm_url,
@@ -203,11 +209,15 @@ class AIGateway:
                 return self._normalize_blueprint(parsed)
             if task_name == "answer_evaluation":
                 return self._normalize_evaluation(parsed)
+            if task_name == "auto_answer_generation":
+                return self._normalize_auto_answer(parsed)
             return parsed
 
         # Best-effort fallback for simple question tasks
         if task_name == "question_generation":
             return {"question_text": self._clean_text(content).strip()}
+        if task_name == "auto_answer_generation":
+            return {"answer_text": self._clean_text(content).strip()}
 
         # Graceful fallbacks for structured tasks when providers emit non-JSON text
         if task_name == "blueprint_generation":
@@ -226,6 +236,8 @@ class AIGateway:
                 "justification": "Model returned non-JSON output.",
                 "is_truthful": True,
             }
+        if task_name == "auto_answer_generation":
+            return {"answer_text": self._clean_text(content).strip()}
 
         # If we reached here, we couldn't produce the expected object
         raise ValueError(
@@ -450,6 +462,38 @@ class AIGateway:
             "justification": str(just),
             "is_truthful": truthful,
         }
+
+    @staticmethod
+    def _normalize_auto_answer(data: Dict[str, Any]) -> Dict[str, Any]:
+        """Normalize auto-answer payloads to a simple schema."""
+
+        def pick(*keys: str) -> Optional[Any]:
+            for key in keys:
+                if key in data and data[key] not in (None, ""):
+                    return data[key]
+            return None
+
+        answer = pick(
+            "answer_text",
+            "answer",
+            "text",
+            "content",
+            "response",
+            "message",
+            "completion",
+            "output",
+            "result",
+            "question_text",
+        )
+
+        if isinstance(answer, (dict, list)):
+            try:
+                answer = json.dumps(answer, ensure_ascii=False)
+            except Exception:
+                answer = str(answer)
+
+        normalized = str(answer or "").strip()
+        return {"answer_text": normalized}
 
 
 # Instantiate a default gateway for module-level use

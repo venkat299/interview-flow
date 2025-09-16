@@ -116,6 +116,10 @@ def init_db(db_path: Path = DB_PATH) -> None:
         cur,
         "question_logs",
         {
+            "job_id": "job_id TEXT",
+            "resume_id": "resume_id TEXT",
+            "candidate_id": "candidate_id TEXT",
+
             "evaluation_type": "evaluation_type TEXT",
             "evaluation_detail": "evaluation_detail TEXT",
             "evaluation_score": "evaluation_score REAL",
@@ -145,6 +149,10 @@ def init_db(db_path: Path = DB_PATH) -> None:
         cur,
         "focus_area_logs",
         {
+            "job_id": "job_id TEXT",
+            "resume_id": "resume_id TEXT",
+            "candidate_id": "candidate_id TEXT",
+
             "evaluation_type": "evaluation_type TEXT",
             "evaluation_detail": "evaluation_detail TEXT",
             "evaluation_score": "evaluation_score REAL",
@@ -321,10 +329,6 @@ def log_focus_area_response(
     conn.close()
 
 
-    if evaluation_type:
-        _update_dimension_averages(cur, session_id, evaluation_type, dimensional_scores)
-    _update_focus_area_average(cur, session_id, focus_area, score)
-
 
 def _parse_detail(detail: Optional[str]) -> Optional[Dict[str, Any]]:
     if not detail:
@@ -465,7 +469,7 @@ def get_session_question_logs(
         (session_id,),
     )
     rows = cur.fetchall()
-    
+
     conn.close()
     result: List[Dict[str, Any]] = []
     for row in rows:
