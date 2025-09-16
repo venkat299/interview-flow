@@ -103,6 +103,7 @@ def test_focus_area_logs_store_evaluations_and_averages(tmp_path):
         session_id="s1",
         job_id="job-42",
         resume_id="resume-99",
+
         candidate_id="c1",
         evaluation=reasoning_eval,
         db_path=db_path,
@@ -128,6 +129,7 @@ def test_focus_area_logs_store_evaluations_and_averages(tmp_path):
         FROM focus_area_logs
         ORDER BY id
         """
+
     )
     rows = cur.fetchall()
     assert rows[0] == ("Python Mastery", "qa_reasoning", "Reasoning", pytest.approx(4.0))
@@ -238,3 +240,4 @@ def test_init_db_backfills_identifier_columns(tmp_path):
     assert evaluation_columns.issubset(question_cols)
     assert identifier_columns.issubset(focus_cols)
     assert evaluation_columns.issubset(focus_cols)
+

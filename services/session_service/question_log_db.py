@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 
+
 DB_PATH = Path(__file__).resolve().with_name("question_logs.db")
 
 
@@ -118,6 +119,7 @@ def init_db(db_path: Path = DB_PATH) -> None:
             "job_id": "job_id TEXT",
             "resume_id": "resume_id TEXT",
             "candidate_id": "candidate_id TEXT",
+
             "evaluation_type": "evaluation_type TEXT",
             "evaluation_detail": "evaluation_detail TEXT",
             "evaluation_score": "evaluation_score REAL",
@@ -150,6 +152,7 @@ def init_db(db_path: Path = DB_PATH) -> None:
             "job_id": "job_id TEXT",
             "resume_id": "resume_id TEXT",
             "candidate_id": "candidate_id TEXT",
+
             "evaluation_type": "evaluation_type TEXT",
             "evaluation_detail": "evaluation_detail TEXT",
             "evaluation_score": "evaluation_score REAL",
@@ -326,6 +329,7 @@ def log_focus_area_response(
     conn.close()
 
 
+
 def _parse_detail(detail: Optional[str]) -> Optional[Dict[str, Any]]:
     if not detail:
         return None
@@ -465,6 +469,7 @@ def get_session_question_logs(
         (session_id,),
     )
     rows = cur.fetchall()
+
     conn.close()
     result: List[Dict[str, Any]] = []
     for row in rows:
