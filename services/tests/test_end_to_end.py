@@ -24,7 +24,27 @@ async def test_run_interview_end_to_end(monkeypatch):
             }
         if task_name == "skill_tag_refinement":
             return {"tags": []}
+        if task_name == "stage_1_intro":
+            return {"question_text": "Welcome!"}
+        if task_name == "stage_2_focus_plan":
+            return {
+                "interview_focus_areas": [
+                    {
+                        "area_name": "Python Mastery",
+                        "reasoning_questions": [
+                            "Why do you enjoy Python?",
+                            "How have you optimized Python code?",
+                        ],
+                        "conceptual_questions": [
+                            "What is PEP 8?",
+                            "Explain the GIL.",
+                        ],
+                    }
+                ]
+            }
         if task_name == "stage_3_question":
+            if "previous answer" in system_prompt:
+                return {"question_text": "Follow-up on Python."}
             return {"question_text": "What is Python?"}
         if task_name == "stage_3_eval":
             return {"result": "pass", "rationale": "ok"}
@@ -41,18 +61,35 @@ async def test_run_interview_end_to_end(monkeypatch):
     orch = Orchestrator()
 
     q1 = await orch.loop(state)
-    assert q1["question_type"] == "theory_primary"
+    assert q1["question_type"] == "intro_greeting"
 
-    q2 = await orch.loop(state, "Answer")
-    assert q2["question_type"] == "theory_followup"
+    q2 = await orch.loop(state, "Intro answer")
+    assert q2["question_type"] == "qa_reasoning"
+    assert q2.get("focus_area") == "Python Mastery"
 
-    q3 = await orch.loop(state, "Answer2")
-    assert q3["question_type"] == "wrapup_feedback"
+    q3 = await orch.loop(state, "Reasoning 1")
+    assert q3["question_type"] == "qa_reasoning"
 
-    q4 = await orch.loop(state, "feedback")
-    assert q4["question_type"] == "wrapup_closing"
+    q4 = await orch.loop(state, "Reasoning 2")
+    assert q4["question_type"] == "qa_conceptual"
 
-    q5 = await orch.loop(state)
-    assert q5 is None
+    q5 = await orch.loop(state, "Conceptual 1")
+    assert q5["question_type"] == "qa_conceptual"
+
+    q6 = await orch.loop(state, "Conceptual 2")
+    assert q6["question_type"] == "theory_primary"
+
+    q7 = await orch.loop(state, "Theory answer")
+    assert q7["question_type"] == "theory_followup"
+
+    q8 = await orch.loop(state, "Theory followup")
+    assert q8["question_type"] == "wrapup_feedback"
+
+    q9 = await orch.loop(state, "feedback")
+    assert q9["question_type"] == "wrapup_closing"
+
+    q10 = await orch.loop(state)
+    assert q10 is None
+
     assert state.packet.time_remaining_min == 0
 

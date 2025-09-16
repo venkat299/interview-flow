@@ -137,14 +137,17 @@ class ConnectionManager:
                         )
                 except Exception:
                     pass
+                payload = {
+                    "question_text": question,
+                    "stage": state.current_phase,
+                    "question_type": qtype,
+                }
+                if "focus_area" in q_payload:
+                    payload["focus_area"] = q_payload["focus_area"]
                 await websocket.send_json(
                     {
                         "event": "new_question",
-                        "payload": {
-                            "question_text": question,
-                            "stage": state.current_phase,
-                            "question_type": qtype,
-                        },
+                        "payload": payload,
                     }
                 )
             return
@@ -215,13 +218,16 @@ class ConnectionManager:
                     )
             except Exception:
                 pass
+            payload = {
+                "question_text": question,
+                "stage": state.current_phase,
+                "question_type": qtype,
+            }
+            if "focus_area" in q_payload:
+                payload["focus_area"] = q_payload["focus_area"]
             await websocket.send_json(
                 {
                     "event": "new_question",
-                    "payload": {
-                        "question_text": question,
-                        "stage": state.current_phase,
-                        "question_type": qtype,
-                    },
+                    "payload": payload,
                 }
             )

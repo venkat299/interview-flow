@@ -1,6 +1,6 @@
 """Core AI interview utilities."""
 
-from typing import Optional
+from typing import List, Optional
 from types import SimpleNamespace
 
 from .schemas import (
@@ -11,6 +11,8 @@ from .schemas import (
     EvaluationResponse,
     ContextPacket,
     VerificationResult,
+    FocusAreaQuestions,
+    FocusAreaExchange,
 )
 from gateway_service import gateway
 from common.skill_inventory import SKILL_INVENTORY
@@ -22,6 +24,8 @@ from .programs.stage0_analysis import (
     Stage0AnalysisProgram,
     JDResumeAnalysisInput,
 )
+from .programs.stage1_intro import Stage1IntroProgram, IntroModuleInput
+from .programs.stage2_qa import Stage2QAProgram, Stage2QAInput
 from .programs.stage3_theory import (
     TheoryQuestionProgram,
     TheoryQuestionInput,
@@ -194,6 +198,8 @@ _interviewer = LLMInterviewer()
 _monitor = LLMMonitor()
 _scoring = ScoringEngine()
 _stage0 = Stage0AnalysisProgram()
+_intro = Stage1IntroProgram()
+_qa_plan = Stage2QAProgram()
 _theory_question = TheoryQuestionProgram()
 _theory_eval = TheoryEvalProgram()
 _wrap_up = WrapUpProgram()
@@ -213,6 +219,88 @@ def _decrement_time(packet: ContextPacket, minutes: int) -> None:
 
     remaining = packet.time_remaining_min or packet.duration_min
     packet.time_remaining_min = max(remaining - minutes, 0)
+
+
+async def intro_greeting(packet: ContextPacket) -> dict:
+    """Generate the introductory greeting and decrement available time."""
+
+    output = await _intro(IntroModuleInput(role=packet.role_from_jd))
+    _decrement_time(packet, 1)
+    return {"question_text": output.question_text, "question_type": "intro_greeting"}
+
+
+def record_intro_answer(packet: ContextPacket, answer: str) -> None:
+    """Append the candidate's introduction to session notes."""
+
+    if answer:
+        packet.notes.append(f"Candidate introduction: {answer}")
+
+
+async def ensure_focus_area_plan(packet: ContextPacket) -> List[FocusAreaQuestions]:
+    """Fetch or reuse the generated focus areas for the QA module."""
+
+    if packet.focus_areas:
+        return packet.focus_areas
+
+    output = await _qa_plan(
+        Stage2QAInput(jd_text=packet.jd_text, resume_text=packet.resume_text)
+    )
+
+    cleaned: List[FocusAreaQuestions] = []
+    for area in output.interview_focus_areas:
+        name = (area.area_name or "").strip()
+        if not name:
+            continue
+        reasoning = [q.strip() for q in list(area.reasoning_questions or []) if q and q.strip()]
+        conceptual = [
+            q.strip() for q in list(area.conceptual_questions or []) if q and q.strip()
+        ]
+        cleaned.append(
+            FocusAreaQuestions(
+                area_name=name,
+                reasoning_questions=reasoning[:2],
+                conceptual_questions=conceptual[:2],
+            )
+        )
+
+    packet.focus_areas = cleaned
+    return packet.focus_areas
+
+
+def build_focus_area_question(
+    packet: ContextPacket,
+    focus_area: str,
+    question_category: str,
+    question_text: str,
+) -> dict:
+    """Create the payload for a QA question while consuming interview time."""
+
+    normalized_type = f"qa_{question_category}"
+    _decrement_time(packet, 1)
+    return {
+        "question_text": question_text,
+        "question_type": normalized_type,
+        "focus_area": focus_area,
+    }
+
+
+def record_focus_area_answer(
+    packet: ContextPacket,
+    focus_area: str,
+    question_type: str,
+    question_text: str,
+    answer: str,
+) -> None:
+    """Persist a QA turn on the context packet for later evaluation."""
+
+    packet.focus_area_history.append(
+        FocusAreaExchange(
+            area_name=focus_area,
+            question_type=question_type,
+            question_text=question_text,
+            answer_text=answer,
+        )
+    )
 
 
 

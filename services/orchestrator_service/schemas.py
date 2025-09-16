@@ -52,6 +52,23 @@ class InterviewBlueprintResponse(BaseModel):
     topics: List[TopicBlueprint]
 
 
+class FocusAreaQuestions(BaseModel):
+    """Grouped reasoning and conceptual questions for a focus area."""
+
+    area_name: str
+    reasoning_questions: List[str] = Field(default_factory=list)
+    conceptual_questions: List[str] = Field(default_factory=list)
+
+
+class FocusAreaExchange(BaseModel):
+    """Record of a single focus area question/answer pair."""
+
+    area_name: str
+    question_type: str
+    question_text: str
+    answer_text: Optional[str] = None
+
+
 class EvaluationRequest(BaseModel):
     """Request model for evaluating a candidate's answer."""
 
@@ -127,3 +144,5 @@ class ContextPacket(BaseModel):
     notes: List[str] = Field(default_factory=list)
     role_skill_tags: List[str] = Field(default_factory=list)
     experience_plan: List[str] = Field(default_factory=list)
+    focus_areas: List[FocusAreaQuestions] = Field(default_factory=list)
+    focus_area_history: List[FocusAreaExchange] = Field(default_factory=list)
