@@ -20,6 +20,24 @@ async def test_run_interview_flow(monkeypatch):
                 "overlap_skills": ["python"],
                 "primary_overlap_focus": "python",
             }
+        if task_name == "stage_1_intro":
+            return {"question_text": "Welcome! Tell me about yourself."}
+        if task_name == "stage_2_focus_plan":
+            return {
+                "interview_focus_areas": [
+                    {
+                        "area_name": "Python Mastery",
+                        "reasoning_questions": [
+                            "Why do you enjoy working with Python?",
+                            "How have you improved a Python service?",
+                        ],
+                        "conceptual_questions": [
+                            "What is a virtual environment?",
+                            "Explain list comprehensions.",
+                        ],
+                    }
+                ]
+            }
         if task_name == "stage_3_question":
             if "python" in system_prompt:
                 return {"question_text": "What is Python?"}
@@ -39,6 +57,8 @@ async def test_run_interview_flow(monkeypatch):
     assert [v.skill for v in result.verifications] == ["python", "db"]
     assert call_order == [
         "stage_0_analysis",
+        "stage_1_intro",
+        "stage_2_focus_plan",
         "stage_3_question",
         "stage_3_eval",
         "stage_3_question",
