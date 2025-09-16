@@ -7,6 +7,12 @@ from .schemas import ContextPacket
 from .programs.stage0_analysis import Stage0AnalysisProgram, JDResumeAnalysisInput
 from .programs.stage1_intro import Stage1IntroProgram, IntroModuleInput
 from .programs.stage2_qa import Stage2QAProgram, Stage2QAInput
+from .programs.stage3_theory import (
+    TheoryQuestionProgram,
+    TheoryQuestionInput,
+    TheoryEvalProgram,
+    TheoryEvalInput,
+)
 from .programs.stage4_wrapup import WrapUpProgram, WrapUpInput
 
 
@@ -40,6 +46,28 @@ async def stage2_focus_plan_node(state: InterviewState) -> dict:
     return {"focus_areas": output.interview_focus_areas}
 
 
+async def stage3_theory_node(state: InterviewState) -> dict:
+    """Run a theory check on each collected skill in sequence."""
+    skills = state.followup_hooks or state.skill_hooks or state.jd_core_skills
+    if not skills:
+        return {}
+
+    idx = len(state.verifications)
+    if idx >= len(skills):
+        return {}
+
+    skill = skills[idx]
+    question = await TheoryQuestionProgram()(TheoryQuestionInput(skill=skill))
+    eval_result = await TheoryEvalProgram()(TheoryEvalInput(answer=""))
+    verification = VerificationResult(
+        skill=skill, result=eval_result.result, rationale=eval_result.rationale
+    )
+    return {
+        "verifications": state.verifications + [verification],
+        "notes": state.notes + [question.question_text],
+    }
+
+
 async def stage4_wrapup_node(state: InterviewState) -> dict:
     """Summarize interview outcomes."""
     output = await WrapUpProgram()(WrapUpInput(notes=state.notes, verifications=state.verifications))
@@ -52,12 +80,23 @@ def build_interview_graph() -> StateGraph:
     graph.add_node("stage0_analysis", stage0_analysis_node)
     graph.add_node("stage1_intro", stage1_intro_node)
     graph.add_node("stage2_focus_plan", stage2_focus_plan_node)
+    graph.add_node("stage3_theory", stage3_theory_node)
     graph.add_node("stage4_wrapup", stage4_wrapup_node)
 
     graph.add_edge(START, "stage0_analysis")
     graph.add_edge("stage0_analysis", "stage1_intro")
     graph.add_edge("stage1_intro", "stage2_focus_plan")
-    graph.add_edge("stage2_focus_plan", "stage4_wrapup")
+    graph.add_edge("stage2_focus_plan", "stage3_theory")
+
+    def _more_theory(state: InterviewState) -> str:
+        skills = state.followup_hooks or state.skill_hooks or state.jd_core_skills
+        return "again" if len(state.verifications) < len(skills) else "done"
+
+    graph.add_conditional_edges(
+        "stage3_theory",
+        _more_theory,
+        {"again": "stage3_theory", "done": "stage4_wrapup"},
+    )
 
     graph.add_edge("stage4_wrapup", END)
 

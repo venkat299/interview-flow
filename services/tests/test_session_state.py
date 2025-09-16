@@ -42,7 +42,7 @@ def test_stage_progression_and_time():
     state.advance_phase()
     assert state.current_phase == "qa"
     state.advance_phase()
-    assert state.current_phase == "wrap_up"
+    assert state.current_phase == "theory"
     state.advance_phase()
     assert state.current_phase == "wrap_up"
     state.decrement_time(3)

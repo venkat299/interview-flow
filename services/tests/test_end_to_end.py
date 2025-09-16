@@ -42,6 +42,12 @@ async def test_run_interview_end_to_end(monkeypatch):
                     }
                 ]
             }
+        if task_name == "stage_3_question":
+            if "previous answer" in system_prompt:
+                return {"question_text": "Follow-up on Python."}
+            return {"question_text": "What is Python?"}
+        if task_name == "stage_3_eval":
+            return {"result": "pass", "rationale": "ok"}
         if task_name == "question_generation":
             assert "thanks the candidate" in system_prompt.lower()
             assert "warm compliment" in system_prompt.lower()
@@ -75,11 +81,19 @@ async def test_run_interview_end_to_end(monkeypatch):
     assert q5["question_type"] == "qa_conceptual"
 
     q6 = await orch.loop(state, "Conceptual 2")
-    assert q6["question_type"] == "wrapup_feedback"
-    assert "thanks" in q6["question_text"].lower()
+    assert q6["question_type"] == "theory_primary"
 
-    q7 = await orch.loop(state, "Great experience!")
-    assert q7 is None
+    q7 = await orch.loop(state, "Theory answer")
+    assert q7["question_type"] == "theory_followup"
+
+    q8 = await orch.loop(state, "Theory followup")
+    assert q8["question_type"] == "wrapup_feedback"
+
+    q9 = await orch.loop(state, "feedback")
+    assert q9["question_type"] == "wrapup_closing"
+
+    q10 = await orch.loop(state)
+    assert q10 is None
 
     assert state.packet.time_remaining_min == 0
 

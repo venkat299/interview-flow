@@ -38,6 +38,12 @@ async def test_run_interview_flow(monkeypatch):
                     }
                 ]
             }
+        if task_name == "stage_3_question":
+            if "python" in system_prompt:
+                return {"question_text": "What is Python?"}
+            return {"question_text": "What is a database?"}
+        if task_name == "stage_3_eval":
+            return {"result": "pass", "rationale": "ok"}
         if task_name == "stage_4_summary":
             return {"strengths": ["reasoning"], "risks": [], "follow_ups": []}
         raise AssertionError(task_name)
@@ -52,6 +58,10 @@ async def test_run_interview_flow(monkeypatch):
         "stage_0_analysis",
         "stage_1_intro",
         "stage_2_focus_plan",
+        "stage_3_question",
+        "stage_3_eval",
+        "stage_3_question",
+        "stage_3_eval",
         "stage_4_summary",
     ]
 

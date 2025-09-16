@@ -8,7 +8,11 @@ from orchestrator_service.schemas import ContextPacket
 class InterviewState:
     """Tracks the shared context packet and phase progression."""
 
-    phases: List[str] = ["intro", "qa", "wrap_up"]
+    phases: List[str] = ["intro", "qa", "theory", "wrap_up"]
+    theory_steps: List[str] = [
+        "primary",
+        "followup",
+    ]
     wrapup_steps: List[str] = [
         "feedback",
     ]
@@ -48,6 +52,24 @@ class InterviewState:
         """Move to the next interview phase if available."""
         if self.phase_index < len(self.phases) - 1:
             self.phase_index += 1
+
+    @property
+    def current_theory_step(self) -> str:
+        return self.theory_steps[self.theory_index]
+
+    def advance_theory_step(self) -> None:
+        if self.theory_index < len(self.theory_steps) - 1:
+            self.theory_index += 1
+        else:
+            self.theory_index = 0
+            self.theory_skill_index += 1
+            skills = (
+                self.packet.followup_hooks
+                or self.packet.skill_hooks
+                or self.packet.jd_core_skills
+            )
+            if self.theory_skill_index >= len(skills):
+                self.advance_phase()
 
     def ensure_qa_queue(self, focus_areas: List) -> None:
         """Populate the QA queue from the provided focus areas if empty."""

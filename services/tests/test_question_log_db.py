@@ -1,9 +1,4 @@
 import sqlite3
-import sys
-from pathlib import Path
-
-sys.path.append(str(Path(__file__).resolve().parents[1]))
-
 from session_service.question_log_db import (
     init_db,
     log_question_response,
@@ -50,10 +45,6 @@ def test_log_question_response_captures_question_and_answer(tmp_path):
         "primary",
         "What is Python?",
         "A language",
-        "job-42",
-        "resume-99",
-        "Strong fundamentals",
-        8.5,
     )
 
 
@@ -66,28 +57,13 @@ def test_log_focus_area_response_persists_focus_area(tmp_path):
         question_text="Why did you choose Python?",
         answer_text="Because of the ecosystem",
         session_id="s1",
-        job_id="job-42",
-        resume_id="resume-99",
         candidate_id="c1",
-        evaluation_detail="Insightful",
-        evaluation_score=9.0,
         db_path=db_path,
     )
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
     cur.execute(
-        """
-        SELECT
-            focus_area,
-            question_type,
-            question_text,
-            answer_text,
-            job_id,
-            resume_id,
-            evaluation_detail,
-            evaluation_score
-        FROM focus_area_logs
-        """
+        "SELECT focus_area, question_type, question_text, answer_text FROM focus_area_logs"
     )
     row = cur.fetchone()
     conn.close()
@@ -96,8 +72,4 @@ def test_log_focus_area_response_persists_focus_area(tmp_path):
         "qa_reasoning",
         "Why did you choose Python?",
         "Because of the ecosystem",
-        "job-42",
-        "resume-99",
-        "Insightful",
-        9.0,
     )

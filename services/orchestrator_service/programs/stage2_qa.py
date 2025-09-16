@@ -1,6 +1,7 @@
 """DSPy program for Stage-2 focus area interview planning."""
 from __future__ import annotations
 
+from string import Template
 from typing import List
 
 import dspy
@@ -10,62 +11,67 @@ from gateway_service import gateway
 from ..schemas import FocusAreaQuestions
 
 
-PROMPT_PREAMBLE = """You are an expert AI technical recruiter. Your task is to analyze the provided Job Description (JD) and Resume to create a structured interview question guide.
+PROMPT_TEMPLATE = Template(
+    """You are an expert AI technical recruiter. Your task is to analyze the provided Job Description (JD) and Resume to create a structured and cohesive interview question guide.
 
 Follow these instructions precisely:
 
-    Analyze and Synthesize: First, identify the key intersections between the JD's requirements (e.g., skills, responsibilities) and the candidate's experience (e.g., projects, roles).
+    1. Analyze and Synthesize: First, identify the key intersections between the JD's requirements (e.g., skills, responsibilities) and the candidate's experience (e.g., projects, roles).
 
-    Define Focus Areas: Based on your analysis, define 5 distinct and logical Focus Areas for a technical interview. Each Focus Area's name should be clear and concise (e.g., \"Productionization & MLOps,\" \"Modeling & Algorithms\").
+    2. Define Focus Areas: Based on your analysis, define 5 distinct and logical Focus Areas for a technical interview. Each Focus Area's name should be clear and concise (e.g., "Productionization & MLOps," "Modeling & Algorithms").
 
-    Generate Questions: For each of the 5 Focus Areas, you must generate exactly 4 questions that are directly relevant to the JD and resume.
+    3. Generate Questions: For each of the 5 Focus Areas, you must generate exactly 4 questions that are directly relevant to the JD and resume.
 
-    Adhere to Question Constraints:
+    4. Adhere to Question Constraints:
 
-        Question Types: The 4 questions for each area must be categorized as:
+        - Question Types: The 4 questions for each area must be categorized as:
+            - 2 reasoning questions: These should probe the "why" and "how" behind the candidate's decisions and experiences.
+            - 2 conceptual questions: These should test factual or definitional knowledge of tools and concepts mentioned.
 
-            2 reasoning questions: These should probe the \"why\" and \"how\" behind the candidate's decisions and experiences.
+        - Thematic Cohesion: The reasoning and conceptual questions within a single Focus Area must be thematically linked. For instance, if a reasoning question asks *why* the candidate chose Airflow for a project, a related conceptual question could ask to define a core Airflow concept like a DAG. This creates a focused and logical line of questioning.
 
-            2 conceptual questions: These should test factual or definitional knowledge of tools and concepts mentioned.
+        - Simplicity: All questions must be non-compound. Do not ask two things in one question.
 
-        Simplicity: All questions must be non-compound. Do not ask two things in one question.
+        - Contextual Framing: Frame your questions with context from the candidate's resume to make them more specific and conversational. For example, instead of asking "What is your reasoning for choosing a batch design?", ask "Your Automated Forecasting Pipeline project is a strong example of an end-to-end system. Could you walk me through your reasoning for choosing a batch design on GCP?"
 
-        Brevity: Each question must be concise, limited to a maximum of one or two lines.
-
-    Format Output as JSON: The final output must be a single, well-formed JSON object. Use the following structure:
+    5. Format Output as JSON: The final output must be a single, well-formed JSON object. Use the following structure:
 
 {
-  \"interview_focus_areas\": [
+  "interview_focus_areas": [
     {
-      \"area_name\": \"Example: Project & Problem Formulation\",
-      \"reasoning_questions\": [
-        \"Question 1...\",
-        \"Question 2...\"
+      "area_name": "Example: Project & Problem Formulation",
+      "reasoning_questions": [
+        "Question 1...",
+        "Question 2..."
       ],
-      \"conceptual_questions\": [
-        \"Question 1...\",
-        \"Question 2...\"
+      "conceptual_questions": [
+        "Question 1...",
+        "Question 2..."
       ]
     },
     {
-      \"area_name\": \"Focus Area 2 Name...\",
-      \"reasoning_questions\": [
-        \"...\",
-        \"...\"
+      "area_name": "Focus Area 2 Name...",
+      "reasoning_questions": [
+        "...",
+        "..."
       ],
-      \"conceptual_questions\": [
-        \"...\",
-        \"...\"
+      "conceptual_questions": [
+        "...",
+        "..."
       ]
     }
   ]
 }
 
 [INSERT JOB DESCRIPTION HERE]
+
+$job_description
+
+[INSERT RESUME HERE]
+
+$resume
 """
-
-PROMPT_RESUME_HEADER = "[INSERT RESUME HERE]"
-
+)
 
 class Stage2QAInput(BaseModel):
     """Inputs for generating focus areas and questions."""
@@ -84,9 +90,9 @@ class Stage2QAProgram(dspy.Module):
     """Request a focus-area driven interview plan from a dedicated LLM."""
 
     async def __call__(self, inp: Stage2QAInput) -> Stage2QAOutput:
-        prompt = (
-            f"{PROMPT_PREAMBLE}\n\n{inp.jd_text or 'Not provided'}"
-            f"\n\n{PROMPT_RESUME_HEADER}\n\n{inp.resume_text or 'Not provided'}"
+        prompt = PROMPT_TEMPLATE.substitute(
+            job_description=inp.jd_text or "Not provided",
+            resume=inp.resume_text or "Not provided",
         )
         data = await gateway.execute_task(
             task_name="stage_2_focus_plan",
