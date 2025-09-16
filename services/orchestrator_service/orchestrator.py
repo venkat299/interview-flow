@@ -220,6 +220,7 @@ class Orchestrator:
             state.last_focus_area = q_payload.get("focus_area")
             return q_payload
 
+
         if phase == "wrap_up":
             if state.wrapup_index >= len(state.wrapup_steps):
                 state.advance_phase()
