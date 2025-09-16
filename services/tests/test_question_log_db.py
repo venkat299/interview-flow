@@ -68,6 +68,7 @@ def test_log_question_response_captures_question_and_answer(tmp_path):
     assert pytest.approx(stored_detail["overall_score"], rel=1e-6) == 4.25
     assert pytest.approx(row[8], rel=1e-6) == 4.25
 
+
     logs = get_session_question_logs("s1", db_path=db_path)
     assert logs[0]["evaluation_type"] == "Reasoning"
     assert pytest.approx(logs[0]["evaluation_payload"]["overall_score"], rel=1e-6) == 4.25
@@ -184,3 +185,4 @@ def test_focus_area_logs_store_evaluations_and_averages(tmp_path):
     dim_summary = get_dimension_averages("s1", db_path=db_path)
     assert "Reasoning" in dim_summary and "Conceptual" in dim_summary
     assert any(item["dimension"] == "problem_comprehension" for item in dim_summary["Reasoning"])
+

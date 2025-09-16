@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 
+
 DB_PATH = Path(__file__).resolve().with_name("question_logs.db")
 
 
@@ -320,6 +321,11 @@ def log_focus_area_response(
     conn.close()
 
 
+    if evaluation_type:
+        _update_dimension_averages(cur, session_id, evaluation_type, dimensional_scores)
+    _update_focus_area_average(cur, session_id, focus_area, score)
+
+
 def _parse_detail(detail: Optional[str]) -> Optional[Dict[str, Any]]:
     if not detail:
         return None
@@ -459,6 +465,7 @@ def get_session_question_logs(
         (session_id,),
     )
     rows = cur.fetchall()
+    ]
     conn.close()
     result: List[Dict[str, Any]] = []
     for row in rows:
