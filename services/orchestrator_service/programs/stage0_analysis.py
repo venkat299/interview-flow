@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import List, Optional
 
 import dspy
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from gateway_service import gateway
 
@@ -26,6 +26,23 @@ class JDResumeAnalysisOutput(BaseModel):
     primary_overlap_focus: Optional[str] = None
     selected_project: Optional[str] = None
     experience_plan: List[str] = Field(default_factory=list)
+
+    @field_validator("primary_overlap_focus", mode="before")
+    @classmethod
+    def _coerce_primary_overlap_focus(cls, value: object) -> Optional[str]:
+        """Normalize LLM output to a single descriptive string."""
+
+        if value is None or isinstance(value, str):
+            return value
+        if isinstance(value, list):
+            cleaned_values = [
+                str(item).strip()
+                for item in value
+                if item is not None and str(item).strip()
+            ]
+            return ", ".join(cleaned_values) if cleaned_values else None
+        coerced = str(value).strip()
+        return coerced or None
 
 
 class Stage0AnalysisProgram(dspy.Module):
