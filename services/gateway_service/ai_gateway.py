@@ -7,19 +7,20 @@ settings (default: "local").
 """
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any, Dict, Optional
 import json
 import re
+from pathlib import Path
+from typing import Any, Dict, Optional
 
+import anyio
 import httpx
 import yaml
 from json_repair import repair_json
 
+from google import genai
+from google.genai.types import GenerateContentConfig
+
 from .config import settings
-
-
-GEMINI_PROVIDER_NAMES = {"gemini", "google_gemini", "google", "google_studio", "google-studio"}
 
 
 class AIGateway:
@@ -43,6 +44,8 @@ class AIGateway:
         except FileNotFoundError:
             self.config = {}
         self._clients: Dict[str, httpx.AsyncClient] = {}
+        self._gemini_client: Optional[genai.Client] = None
+        self._gemini_client_key: Optional[str] = None
 
     def _provider_from_settings(self, provider_name: Optional[str]) -> Dict[str, Optional[str]]:
         """Return a provider config derived from settings for known providers.
@@ -56,9 +59,9 @@ class AIGateway:
                 "api_key": settings.openai_api_key or None,
                 "model": settings.openai_model,
             }
-        if name in GEMINI_PROVIDER_NAMES:
+        if name == "gemini":
             return {
-                "base_url": settings.gemini_api_url,
+                "type": "gemini",
                 "api_key": settings.gemini_api_key or None,
                 "model": settings.gemini_model,
             }
@@ -81,6 +84,165 @@ class AIGateway:
             self._clients[provider] = httpx.AsyncClient(timeout=None)
         return self._clients[provider]
 
+    def _get_gemini_client(self, api_key: Optional[str]) -> genai.Client:
+        """Return a cached Google GenAI client keyed by API secret."""
+
+        key = (api_key or settings.gemini_api_key or "").strip() or None
+        if self._gemini_client is None or self._gemini_client_key != key:
+            kwargs: Dict[str, Any] = {}
+            if key:
+                kwargs["api_key"] = key
+            self._gemini_client = genai.Client(**kwargs)
+            self._gemini_client_key = key
+        return self._gemini_client
+
+    async def _ping_gemini(
+        self,
+        provider_cfg: Dict[str, Optional[str]],
+        *,
+        connect_timeout: float,
+        read_timeout: float,
+    ) -> None:
+        """Health check for the Gemini provider using google-genai."""
+
+        model = provider_cfg.get("model") or settings.gemini_model
+        if not model:
+            raise RuntimeError("Gemini provider missing model configuration")
+
+        api_key = provider_cfg.get("api_key") or settings.gemini_api_key or None
+
+        client = self._get_gemini_client(api_key)
+        config = GenerateContentConfig(system_instruction="You are a health check probe.")
+        timeout_budget = max(connect_timeout + read_timeout, 1.0)
+        try:
+            async with anyio.fail_after(timeout_budget):
+                await anyio.to_thread.run_sync(
+                    lambda: client.models.generate_content(
+                        model=model,
+                        contents="ping",
+                        config=config,
+                    )
+                )
+        except anyio.exceptions.TimeoutError as exc:  # pragma: no cover - defensive
+            raise RuntimeError("Gemini health check timed out") from exc
+
+    async def _execute_gemini(
+        self,
+        task_name: str,
+        model: str,
+        system_prompt: str,
+        user_prompt: Optional[str],
+        option_overrides: Dict[str, Any],
+        provider_cfg: Dict[str, Optional[str]],
+    ) -> Any:
+        """Execute a Gemini request via the official google-genai client."""
+
+        api_key = provider_cfg.get("api_key") or settings.gemini_api_key or None
+        client = self._get_gemini_client(api_key)
+
+        config_kwargs: Dict[str, Any] = {}
+        if system_prompt:
+            config_kwargs["system_instruction"] = system_prompt
+
+        if "temperature" in option_overrides:
+            config_kwargs["temperature"] = option_overrides["temperature"]
+        if "top_p" in option_overrides:
+            config_kwargs["top_p"] = option_overrides["top_p"]
+        if "max_tokens" in option_overrides:
+            try:
+                config_kwargs["max_output_tokens"] = int(option_overrides["max_tokens"])
+            except Exception:
+                pass
+        stop_sequences = option_overrides.get("stop")
+        if isinstance(stop_sequences, str) and stop_sequences:
+            config_kwargs["stop_sequences"] = [stop_sequences]
+        elif isinstance(stop_sequences, list):
+            stops = [str(s) for s in stop_sequences if isinstance(s, (str, int, float))]
+            if stops:
+                config_kwargs["stop_sequences"] = stops
+
+        resp_format = option_overrides.get("response_format")
+        if isinstance(resp_format, dict) and resp_format.get("type") == "json_object":
+            config_kwargs["response_mime_type"] = "application/json"
+
+        config = GenerateContentConfig(**config_kwargs) if config_kwargs else None
+
+        prompt_text = user_prompt or ""
+        if not prompt_text:
+            prompt_text = system_prompt or "Respond to the instructions."
+
+        response = await anyio.to_thread.run_sync(
+            lambda: client.models.generate_content(
+                model=model,
+                contents=str(prompt_text),
+                config=config,
+            )
+        )
+
+        raw = response.to_json_dict() if hasattr(response, "to_json_dict") else response
+        content: Optional[str] = None
+        if hasattr(response, "text"):
+            try:
+                text_value = response.text  # type: ignore[attr-defined]
+            except Exception:  # pragma: no cover - defensive
+                text_value = None
+            if isinstance(text_value, str):
+                content = text_value
+        if content is None and getattr(response, "candidates", None):
+            candidates = getattr(response, "candidates", None)
+            if isinstance(candidates, list) and candidates:
+                first = candidates[0]
+                parts = getattr(first, "content", None)
+                if isinstance(parts, list) and parts:
+                    first_part = parts[0]
+                    text_attr = getattr(first_part, "text", None)
+                    if isinstance(text_attr, str):
+                        content = text_attr
+
+        return self._finalize_task_output(task_name, raw, content)
+
+    def _finalize_task_output(self, task_name: str, raw: Any, content: Optional[str]) -> Any:
+        """Normalize LLM responses into task-specific payloads."""
+
+        if not isinstance(content, str):
+            return raw
+
+        parsed = self._parse_json_like(content)
+        if isinstance(parsed, dict):
+            if task_name == "blueprint_generation":
+                return self._normalize_blueprint(parsed)
+            if task_name == "answer_evaluation":
+                return self._normalize_evaluation(parsed)
+            if task_name == "auto_answer_generation":
+                return self._normalize_auto_answer(parsed)
+            return parsed
+
+        if task_name == "question_generation":
+            return {"question_text": self._clean_text(content).strip()}
+        if task_name == "auto_answer_generation":
+            return {"answer_text": self._clean_text(content).strip()}
+
+        if task_name == "blueprint_generation":
+            salvage = self._parse_json_like(self._clean_text(content))
+            if isinstance(salvage, dict):
+                return self._normalize_blueprint(salvage)
+            return self._normalize_blueprint({})
+        if task_name == "answer_evaluation":
+            return {
+                "score": 0.0,
+                "assessed_depth": "Intermediate",
+                "llm_confidence": "Low",
+                "justification": "Model returned non-JSON output.",
+                "is_truthful": True,
+            }
+
+        raise ValueError(
+            "LLM output was not valid JSON for task '"
+            + task_name
+            + "': "
+            + content[:500]
+        )
+
     async def _ping_provider(self, provider_name: str, *, connect_timeout: float = 5.0, read_timeout: float = 15.0) -> None:
         """Send a minimal chat request to verify provider connectivity.
 
@@ -93,30 +255,31 @@ class AIGateway:
         default_provider_cfg = self._provider_from_settings(provider_name)
         provider_cfg: Dict[str, Optional[str]] = {**default_provider_cfg, **yaml_provider_cfg}
 
+        provider_type = str(provider_cfg.get("type") or provider_name).lower()
+
         model = provider_cfg.get("model")
+        if provider_type == "gemini":
+            await self._ping_gemini(
+                provider_cfg,
+                connect_timeout=connect_timeout,
+                read_timeout=read_timeout,
+            )
+            return
+
         url = provider_cfg.get("base_url")
         api_key = provider_cfg.get("api_key")
         if not url or not model:
             raise RuntimeError(f"Provider '{provider_name}' missing url/model configuration")
 
-        is_gemini = self._is_gemini_provider(provider_name)
         headers: Dict[str, str] = {}
-        if is_gemini:
-            if not api_key:
-                raise RuntimeError("Gemini provider requires an API key for health check")
-            headers["x-goog-api-key"] = api_key
-        elif api_key:
+        if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
 
         messages: list[Dict[str, str]] = [
             {"role": "system", "content": "healthcheck"},
             {"role": "user", "content": "ping"},
         ]
-        if is_gemini:
-            payload = self._build_gemini_payload(messages, {})
-            url = self._build_gemini_endpoint(url, model)
-        else:
-            payload = {"model": model, "messages": messages}
+        payload = {"model": model, "messages": messages}
 
         client = self._get_client(provider_name)
         timeout = httpx.Timeout(connect=connect_timeout, read=read_timeout, write=read_timeout, pool=read_timeout)
@@ -174,56 +337,53 @@ class AIGateway:
 
         # Resolve model: task->provider->settings default
         model = task_cfg.get("model") or provider_cfg.get("model") or default_provider_cfg.get("model")
+        provider_type = str(provider_cfg.get("type") or provider_name).lower()
+
+        option_overrides: Dict[str, Any] = {}
+        # Optional generation controls from YAML: task overrides provider
+        # Common OpenAI-compatible params: max_tokens, temperature, top_p, n, stop, response_format
+        for key in ("max_tokens", "temperature", "top_p", "n", "stop", "response_format"):
+            if isinstance(task_cfg.get(key), (int, float, str, list, dict)):
+                option_overrides[key] = task_cfg.get(key)
+            elif isinstance(provider_cfg.get(key), (int, float, str, list, dict)) and key not in option_overrides:
+                option_overrides[key] = provider_cfg.get(key)
+
+        if provider_type == "gemini":
+            if not model:
+                raise ValueError("Gemini provider missing required configuration (model)")
+            return await self._execute_gemini(
+                task_name,
+                model,
+                system_prompt,
+                user_prompt,
+                option_overrides,
+                provider_cfg,
+            )
+
         url = provider_cfg.get("base_url")
         api_key = provider_cfg.get("api_key")
         if not url or not model:
             raise ValueError(f"Provider '{provider_name}' missing required configuration (url/model)")
-
-        is_gemini = self._is_gemini_provider(provider_name)
 
         messages = [{"role": "system", "content": system_prompt}]
         if user_prompt:
             messages.append({"role": "user", "content": user_prompt})
 
         payload: Dict[str, Any] = {"model": model, "messages": messages}
-        option_overrides: Dict[str, Any] = {}
-        # Optional generation controls from YAML: task overrides provider
-        # Common OpenAI-compatible params: max_tokens, temperature, top_p, n, stop
-        for key in ("max_tokens", "temperature", "top_p", "n", "stop", "response_format"):
-            if isinstance(task_cfg.get(key), (int, float, str, list, dict)):
-                option_overrides[key] = task_cfg.get(key)
-            elif isinstance(provider_cfg.get(key), (int, float, str, list, dict)) and key not in option_overrides:
-                option_overrides[key] = provider_cfg.get(key)
-            if not is_gemini and key in option_overrides:
-                payload[key] = option_overrides[key]
+        for key, value in option_overrides.items():
+            payload[key] = value
 
         headers: Dict[str, str] = {}
-        if is_gemini:
-            if not api_key:
-                raise ValueError("Gemini provider requires an API key")
-            headers["x-goog-api-key"] = api_key
-            request_json = self._build_gemini_payload(messages, option_overrides)
-            request_url = self._build_gemini_endpoint(url, model)
-        else:
-            if api_key:
-                headers["Authorization"] = f"Bearer {api_key}"
-            request_json = payload
-            request_url = url
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+        request_json = payload
+        request_url = url
 
         client = self._get_client(provider_name)
         # No per-request timeout for LLM calls (disabled by request)
         response = await client.post(request_url, headers=headers, json=request_json)
         response.raise_for_status()
         raw = response.json()
-
-        if is_gemini:
-            gemini_text = self._extract_gemini_text(raw)
-            if gemini_text:
-                raw = {
-                    "choices": [
-                        {"message": {"role": "assistant", "content": gemini_text}}
-                    ]
-                }
 
         # Try to normalize OpenAI-style chat completion output into the
         # JSON object requested by callers. If we cannot parse a JSON object
@@ -240,184 +400,7 @@ class AIGateway:
                 # Some providers use `text` instead of nested message
                 content = first["text"]
 
-        # If content is not found, return raw so callers can handle
-        if not isinstance(content, str):
-            return raw
-
-        # Attempt to parse a JSON object from the content
-        # Try to parse JSON content with some light cleaning
-        parsed = self._parse_json_like(content)
-        if isinstance(parsed, dict):
-            # Task-specific normalization into our schemas
-            if task_name == "blueprint_generation":
-                return self._normalize_blueprint(parsed)
-            if task_name == "answer_evaluation":
-                return self._normalize_evaluation(parsed)
-            if task_name == "auto_answer_generation":
-                return self._normalize_auto_answer(parsed)
-            return parsed
-
-        # Best-effort fallback for simple question tasks
-        if task_name == "question_generation":
-            return {"question_text": self._clean_text(content).strip()}
-        if task_name == "auto_answer_generation":
-            return {"answer_text": self._clean_text(content).strip()}
-
-        # Graceful fallbacks for structured tasks when providers emit non-JSON text
-        if task_name == "blueprint_generation":
-            # Attempt another parse after aggressive cleanup
-            salvage = self._parse_json_like(self._clean_text(content))
-            if isinstance(salvage, dict):
-                return self._normalize_blueprint(salvage)
-            # Minimal valid blueprint so the UI can proceed
-            return self._normalize_blueprint({})
-        if task_name == "answer_evaluation":
-            # Conservative default evaluation
-            return {
-                "score": 0.0,
-                "assessed_depth": "Intermediate",
-                "llm_confidence": "Low",
-                "justification": "Model returned non-JSON output.",
-                "is_truthful": True,
-            }
-        if task_name == "auto_answer_generation":
-            return {"answer_text": self._clean_text(content).strip()}
-
-        # If we reached here, we couldn't produce the expected object
-        raise ValueError(
-            "LLM output was not valid JSON for task '"
-            + task_name
-            + "': "
-            + content[:500]
-        )
-
-    @staticmethod
-    def _is_gemini_provider(name: str) -> bool:
-        return isinstance(name, str) and name in GEMINI_PROVIDER_NAMES
-
-    @staticmethod
-    def _build_gemini_endpoint(base_url: Optional[str], model: Optional[str]) -> str:
-        if not base_url or not isinstance(base_url, str):
-            raise ValueError("Gemini provider requires a base_url")
-        if not model:
-            raise ValueError("Gemini provider requires a model")
-        base = base_url.rstrip("/")
-        if not base:
-            raise ValueError("Gemini provider requires a base_url")
-        if ":generate" in base:
-            return base
-        if base.endswith(model):
-            return base if base.endswith(":generateContent") else f"{base}:generateContent"
-        if base.endswith("/models"):
-            return f"{base}/{model}:generateContent"
-        return f"{base}/{model}:generateContent"
-
-    @staticmethod
-    def _build_gemini_payload(messages: list[Dict[str, Any]], overrides: Dict[str, Any]) -> Dict[str, Any]:
-        contents: list[Dict[str, Any]] = []
-        system_prompts: list[str] = []
-        for msg in messages:
-            if not isinstance(msg, dict):
-                continue
-            text = msg.get("content")
-            if not isinstance(text, str):
-                continue
-            cleaned = text.strip()
-            if not cleaned:
-                continue
-            role = (msg.get("role") or "user").lower()
-            if role == "system":
-                system_prompts.append(cleaned)
-                continue
-            gemini_role = "model" if role == "assistant" else "user"
-            contents.append({"role": gemini_role, "parts": [{"text": cleaned}]})
-
-        if not contents and system_prompts:
-            contents.append({"role": "user", "parts": [{"text": "\n\n".join(system_prompts)}]})
-            system_prompts = []
-
-        if not contents:
-            raise ValueError("Gemini request requires at least one message")
-
-        payload: Dict[str, Any] = {"contents": contents}
-        if system_prompts:
-            payload["system_instruction"] = {
-                "role": "system",
-                "parts": [{"text": "\n\n".join(system_prompts)}],
-            }
-
-        generation_config: Dict[str, Any] = {}
-        temperature = overrides.get("temperature")
-        if isinstance(temperature, (int, float)):
-            generation_config["temperature"] = float(temperature)
-        top_p = overrides.get("top_p")
-        if isinstance(top_p, (int, float)):
-            generation_config["topP"] = float(top_p)
-        max_tokens = overrides.get("max_tokens")
-        if isinstance(max_tokens, (int, float)):
-            generation_config["maxOutputTokens"] = int(max_tokens)
-        stops = overrides.get("stop")
-        if isinstance(stops, str) and stops:
-            generation_config["stopSequences"] = [stops]
-        elif isinstance(stops, list):
-            cleaned_stops = [str(item) for item in stops if isinstance(item, (str, int, float))]
-            if cleaned_stops:
-                generation_config["stopSequences"] = cleaned_stops
-        candidate_count = overrides.get("n")
-        if isinstance(candidate_count, (int, float)) and int(candidate_count) > 0:
-            generation_config["candidateCount"] = int(candidate_count)
-        if generation_config:
-            payload["generationConfig"] = generation_config
-
-        response_format = overrides.get("response_format")
-        if isinstance(response_format, dict):
-            fmt = response_format.get("type")
-            if isinstance(fmt, str) and fmt.lower() == "json_object":
-                payload["responseMimeType"] = "application/json"
-        elif isinstance(response_format, str) and response_format.lower() == "json_object":
-            payload["responseMimeType"] = "application/json"
-
-        return payload
-
-    @staticmethod
-    def _extract_gemini_text(raw: Any) -> Optional[str]:
-        if not isinstance(raw, dict):
-            return None
-
-        candidates = raw.get("candidates")
-        if not isinstance(candidates, list):
-            return None
-
-        def _collect_text(obj: Any) -> list[str]:
-            texts: list[str] = []
-            if isinstance(obj, dict):
-                text_val = obj.get("text")
-                if isinstance(text_val, str):
-                    texts.append(text_val)
-                parts = obj.get("parts")
-                if isinstance(parts, list):
-                    for part in parts:
-                        texts.extend(_collect_text(part))
-            elif isinstance(obj, list):
-                for item in obj:
-                    texts.extend(_collect_text(item))
-            elif isinstance(obj, str):
-                texts.append(obj)
-            return texts
-
-        for cand in candidates:
-            if not isinstance(cand, dict):
-                continue
-            texts = _collect_text(cand.get("content"))
-            # Some responses expose text directly on the candidate
-            direct = cand.get("text")
-            if isinstance(direct, str):
-                texts.append(direct)
-            merged = "\n".join(t.strip() for t in texts if isinstance(t, str) and t.strip())
-            if merged:
-                return merged
-
-        return None
+        return self._finalize_task_output(task_name, raw, content)
 
     @staticmethod
     def _parse_json_like(text: str) -> Any:

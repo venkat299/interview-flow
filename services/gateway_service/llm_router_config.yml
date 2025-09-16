@@ -22,18 +22,13 @@ providers:
     temperature: 1.0
     # timeout: 120
 
-  # Dedicated auto-answering model. Override AUTO_LLM_URL/ AUTO_LLM_MODEL to
-  # point at a different LLM endpoint without editing this file.
-  auto_answer:
-    base_url: https://6311e26c90cd.ngrok-free.app/v1/chat/completions
-    api_key: ""
-    model: dpo-qwen2-1.5b-instruct-human-like
-    temperature: 0.8
-
-  # Google AI Studio Gemini provider (uses generateContent endpoint)
+  # Google AI Studio Gemini provider (google-genai SDK)
   gemini:
-    base_url: https://generativelanguage.googleapis.com/v1/models
+    type: gemini
     model: gemini-2.5-flash
+    temperature: 0.7
+    response_format:
+      type: json_object
 
   # Optional: keep OpenAI config for fallback/manual switching
   # openai:
