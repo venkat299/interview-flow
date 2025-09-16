@@ -465,7 +465,7 @@ def get_session_question_logs(
         (session_id,),
     )
     rows = cur.fetchall()
-    ]
+    
     conn.close()
     result: List[Dict[str, Any]] = []
     for row in rows:
