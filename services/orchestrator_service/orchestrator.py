@@ -1,5 +1,6 @@
 """Stage-based orchestrator coordinating interview questions."""
 
+import logging
 from typing import Any, Optional
 
 from .llm_api import (
@@ -8,12 +9,17 @@ from .llm_api import (
     ensure_focus_area_plan,
     build_focus_area_question,
     record_focus_area_answer,
+    evaluate_reasoning_response,
+    evaluate_conceptual_response,
     # theory_primary_question,
     # theory_followup_question,
     wrapup_feedback,
 )
 from .followups import build_followup_question, update_followup_hooks
 from session_service.question_log_db import log_question_response, log_focus_area_response
+
+
+logger = logging.getLogger(__name__)
 
 
 class Orchestrator:
@@ -91,27 +97,53 @@ class Orchestrator:
 
         if phase == "qa":
             if answer is not None and getattr(state, "last_question_text", None):
+                evaluation_payload = None
+                last_qtype = getattr(state, "last_question_type", "") or ""
+                try:
+                    if last_qtype == "qa_reasoning":
+                        evaluation_payload = await evaluate_reasoning_response(
+                            question=getattr(state, "last_question_text", ""),
+                            resume_context=packet.resume_text or "",
+                            answer=answer,
+                        )
+                    elif last_qtype == "qa_conceptual":
+                        evaluation_payload = await evaluate_conceptual_response(
+                            question=getattr(state, "last_question_text", ""),
+                            answer=answer,
+                        )
+                except Exception:
+                    logger.exception(
+                        "Failed to evaluate %s answer for session %s",
+                        last_qtype,
+                        session_id,
+                    )
                 log_question_response(
                     stage=phase,
-                    question_type=getattr(state, "last_question_type", ""),
+                    question_type=last_qtype,
                     question_text=getattr(state, "last_question_text", ""),
                     answer_text=answer,
-                    session_id=getattr(state, "session_id", None),
-                    candidate_id=getattr(state, "candidate_id", None),
+                    session_id=session_id,
+                    job_id=job_id,
+                    resume_id=resume_id,
+                    candidate_id=candidate_id,
+                    evaluation=evaluation_payload,
                 )
                 if getattr(state, "last_focus_area", None):
                     log_focus_area_response(
                         focus_area=state.last_focus_area,
-                        question_type=getattr(state, "last_question_type", ""),
+                        question_type=last_qtype,
                         question_text=getattr(state, "last_question_text", ""),
                         answer_text=answer,
-                        session_id=getattr(state, "session_id", None),
-                        candidate_id=getattr(state, "candidate_id", None),
+                        session_id=session_id,
+                        job_id=job_id,
+                        resume_id=resume_id,
+                        candidate_id=candidate_id,
+                        evaluation=evaluation_payload,
                     )
                     record_focus_area_answer(
                         packet,
                         state.last_focus_area,
-                        getattr(state, "last_question_type", ""),
+                        last_qtype,
                         getattr(state, "last_question_text", ""),
                         answer,
                     )
@@ -165,61 +197,6 @@ class Orchestrator:
 
             state.advance_phase()
             return await self.decide_next_action(state, None)
-
-        if phase == "qa":
-            if answer is not None and getattr(state, "last_question_text", None):
-                log_question_response(
-                    stage=phase,
-                    question_type=getattr(state, "last_question_type", ""),
-                    question_text=getattr(state, "last_question_text", ""),
-                    answer_text=answer,
-                    session_id=session_id,
-                    job_id=job_id,
-                    resume_id=resume_id,
-                    candidate_id=candidate_id,
-                )
-                if getattr(state, "last_focus_area", None):
-                    log_focus_area_response(
-                        focus_area=state.last_focus_area,
-                        question_type=getattr(state, "last_question_type", ""),
-                        question_text=getattr(state, "last_question_text", ""),
-                        answer_text=answer,
-                        session_id=session_id,
-                        job_id=job_id,
-                        resume_id=resume_id,
-                        candidate_id=candidate_id,
-                    )
-                    record_focus_area_answer(
-                        packet,
-                        state.last_focus_area,
-                        getattr(state, "last_question_type", ""),
-                        getattr(state, "last_question_text", ""),
-                        answer,
-                    )
-                state.qa_queue_index += 1
-                state.last_question_text = None
-                state.last_question_type = None
-                state.last_focus_area = None
-
-            focus_areas = await ensure_focus_area_plan(packet)
-            state.ensure_qa_queue(focus_areas)
-
-            if state.qa_queue_index >= len(state.qa_queue):
-                state.advance_phase()
-                return await self.decide_next_action(state, None)
-
-            item = state.qa_queue[state.qa_queue_index]
-            q_payload = build_focus_area_question(
-                packet,
-                item["focus_area"],
-                item["question_type"],
-                item["text"],
-            )
-            state.last_question_text = q_payload.get("question_text")
-            state.last_question_type = q_payload.get("question_type")
-            state.last_focus_area = q_payload.get("focus_area")
-            return q_payload
-
 
         if phase == "wrap_up":
             if state.wrapup_index >= len(state.wrapup_steps):

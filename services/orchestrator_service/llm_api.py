@@ -1,7 +1,8 @@
 """Core AI interview utilities."""
 
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from types import SimpleNamespace
+from string import Template
 
 from .schemas import (
     InterviewRequest,
@@ -193,6 +194,103 @@ async def evaluate_candidate_answer(
     )
 
     return EvaluationResponse.model_validate(data)
+
+
+REASONING_EVAL_PROMPT = Template(
+    """You are an AI Interview Analyst 🧠. Your primary function is to evaluate a candidate's answer to a **reasoning-based** interview question using the multi-dimensional rubric provided below.\n\n**## Instructions:**\n1.  Carefully review the question, the candidate's resume context, and their verbatim answer.\n2.  For each of the 6 rubric dimensions, assign a score from 1 (poor) to 5 (excellent).\n3.  Calculate an `overall_score` by averaging the scores from all 6 dimensions.\n4.  Provide a concise justification for each dimensional score.\n5.  Format the final output as a single JSON object.\n\n**## Inputs:**\n* **QUESTION:** $question\n* **RESUME_CONTEXT:** $resume_context\n* **CANDIDATE_ANSWER:** $answer\n\n**## Output Format (JSON):**\n{\n  "evaluation_type": "Reasoning",\n  "overall_score": <Average of the 6 dimensional scores, rounded to two decimal places>,\n  "dimensional_scores": {\n    "problem_comprehension": {\n      "score": <1-5>,\n      "justification": "<Brief reason for this score>"\n    },\n    "structured_thinking": {\n      "score": <1-5>,\n      "justification": "<...>"\n    },\n    "identification_of_assumptions": {\n      "score": <1-5>,\n      "justification": "<...>"\n    },\n    "analysis_of_trade_offs": {\n      "score": <1-5>,\n      "justification": "<...>"\n    },\n    "clarity_of_communication": {\n      "score": <1-5>,\n      "justification": "<...>"\n    },\n    "conclusion_and_justification": {\n      "score": <1-5>,\n      "justification": "<...>"\n    }\n  }\n}\n"""
+)
+
+
+CONCEPTUAL_EVAL_PROMPT = Template(
+    """You are an AI Interview Analyst 📚. Your primary function is to evaluate a candidate's answer to a **conceptual/factual** interview question using the multi-dimensional rubric provided below.\n\n**## Instructions:**\n1.  Carefully review the question and the candidate's verbatim answer.\n2.  For each of the 5 rubric dimensions, assign a score from 1 (poor) to 5 (excellent).\n3.  Calculate an `overall_score` by averaging the scores from all 5 dimensions.\n4.  Provide a concise justification for each dimensional score.\n5.  Format the final output as a single JSON object.\n\n**## Inputs:**\n* **QUESTION:** $question\n* **CANDIDATE_ANSWER:** $answer\n\n**## Output Format (JSON):**\n{\n  "evaluation_type": "Conceptual",\n  "overall_score": <Average of the 5 dimensional scores, rounded to two decimal places>,\n  "dimensional_scores": {\n    "factual_accuracy": {\n      "score": <1-5>,\n      "justification": "<Brief reason for this score>"\n    },\n    "depth_of_knowledge": {\n      "score": <1-5>,\n      "justification": "<...>"\n    },\n    "clarity_of_explanation": {\n      "score": <1-5>,\n      "justification": "<...>"\n    },\n    "practical_application": {\n      "score": <1-5>,\n      "justification": "<...>"\n    },\n    "handling_of_nuance": {\n      "score": <1-5>,\n      "justification": "<...>"\n    }\n  }\n}\n"""
+)
+
+
+def _truncate_text(text: Optional[str], limit: int = 1800) -> str:
+    """Return ``text`` trimmed to ``limit`` characters for prompt hygiene."""
+
+    if not text:
+        return ""
+    stripped = str(text).strip()
+    if len(stripped) <= limit:
+        return stripped
+    return stripped[: limit - 3] + "..."
+
+
+async def _run_structured_evaluation(task_name: str, prompt: str) -> Dict[str, Any]:
+    """Execute a rubric-based evaluation prompt and ensure a dict is returned."""
+
+    data = await gateway.execute_task(task_name=task_name, system_prompt=prompt)
+    if not isinstance(data, dict):
+        raise ValueError(f"Expected dict response for {task_name}, received: {type(data)!r}")
+    return data
+
+
+def _coerce_float(value: Any) -> Optional[float]:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        try:
+            return float(str(value).strip())
+        except (TypeError, ValueError):
+            return None
+
+
+def _normalize_dimensional_scores(raw: Any) -> Dict[str, Dict[str, Any]]:
+    """Ensure dimensional scores use floats and string justifications."""
+
+    result: Dict[str, Dict[str, Any]] = {}
+    if not isinstance(raw, dict):
+        return result
+    for name, payload in raw.items():
+        if not isinstance(payload, dict):
+            continue
+        score = _coerce_float(payload.get("score"))
+        justification = payload.get("justification")
+        result[str(name)] = {
+            "score": score,
+            "justification": "" if justification is None else str(justification),
+        }
+    return result
+
+
+async def evaluate_reasoning_response(
+    *, question: str, resume_context: str, answer: str
+) -> Dict[str, Any]:
+    """Run the reasoning rubric evaluation for a candidate response."""
+
+    prompt = REASONING_EVAL_PROMPT.substitute(
+        question=str(question).strip(),
+        resume_context=_truncate_text(resume_context),
+        answer=str(answer).strip(),
+    )
+    data = await _run_structured_evaluation("reasoning_evaluation", prompt)
+    data.setdefault("evaluation_type", "Reasoning")
+    overall = _coerce_float(data.get("overall_score"))
+    if overall is not None:
+        data["overall_score"] = overall
+    data["dimensional_scores"] = _normalize_dimensional_scores(
+        data.get("dimensional_scores")
+    )
+    return data
+
+
+async def evaluate_conceptual_response(*, question: str, answer: str) -> Dict[str, Any]:
+    """Run the conceptual rubric evaluation for a candidate response."""
+
+    prompt = CONCEPTUAL_EVAL_PROMPT.substitute(
+        question=str(question).strip(),
+        answer=str(answer).strip(),
+    )
+    data = await _run_structured_evaluation("conceptual_evaluation", prompt)
+    data.setdefault("evaluation_type", "Conceptual")
+    overall = _coerce_float(data.get("overall_score"))
+    if overall is not None:
+        data["overall_score"] = overall
+    data["dimensional_scores"] = _normalize_dimensional_scores(
+        data.get("dimensional_scores")
+    )
+    return data
 
 _interviewer = LLMInterviewer()
 _monitor = LLMMonitor()
