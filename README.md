@@ -33,7 +33,8 @@ Run the service with Docker Compose:
    cp services/gateway_service/.env.example services/gateway_service/.env
    ```
 
-   Update `services/gateway_service/.env` with real values for `LLM_PROVIDER`, `OPENAI_API_KEY`, `OPENAI_MODEL`, and `LOCAL_LLM_URL`.
+   Update `services/gateway_service/.env` with real values for `LLM_PROVIDER`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `LOCAL_LLM_URL`, and `GEMINI_API_KEY` (used for the auto-answer Gemini integration).
+
 
    When using an LLM running on your host machine (e.g., LM Studio), set
    `LLM_PROVIDER=local` and point `LOCAL_LLM_URL` to the host using

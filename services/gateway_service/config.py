@@ -40,6 +40,13 @@ _AUTO_MODEL_YAML: str = (
 _AUTO_API_KEY_YAML: str = (
     _AUTO_PROVIDER.get("api_key") or ""
 ) if isinstance(_AUTO_PROVIDER, dict) else ""
+_GEMINI_PROVIDER: Dict[str, Any] = _PROVIDERS.get("gemini", {}) if isinstance(_PROVIDERS, dict) else {}
+_GEMINI_MODEL_YAML: str = (
+    _GEMINI_PROVIDER.get("model") or "gemini-2.5-flash"
+) if isinstance(_GEMINI_PROVIDER, dict) else "gemini-2.5-flash"
+_GEMINI_API_KEY_YAML: str = (
+    _GEMINI_PROVIDER.get("api_key") or ""
+) if isinstance(_GEMINI_PROVIDER, dict) else ""
 
 
 class Settings:
@@ -52,6 +59,9 @@ class Settings:
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
     # gpt-3.5-turbo
     openai_model: str = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
+
+    gemini_api_key: str = os.getenv("GEMINI_API_KEY", _GEMINI_API_KEY_YAML)
+    gemini_model: str = os.getenv("GEMINI_MODEL", _GEMINI_MODEL_YAML)
 
     # Model identifier for local OpenAI-compatible servers
     # Prefer llm_router_config.yml, allow env override
